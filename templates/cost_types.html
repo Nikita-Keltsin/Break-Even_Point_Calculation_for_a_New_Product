@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Виды затрат</title>
+    <link rel="stylesheet" href="/static/styles/Break-Even_Point_Calculation_for_a_New_Product.css">
+</head>
+<body>
+<div class="app app-light">
+    <div class="status-bar">
+        <span class="sb-time">9:41</span>
+        <span class="sb-icons">
+            <svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+            <svg viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 4.5a9.5 9.5 0 0 1 13 0"/><path d="M4 7a6 6 0 0 1 8 0"/><path d="M6.5 9.5a2.5 2.5 0 0 1 3 0"/><circle cx="8" cy="11" r="0.8" fill="currentColor" stroke="none"/></svg>
+            <svg viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><path d="M23.5 4v4a2.2 2.2 0 0 0 0-4Z" fill="currentColor" opacity=".45"/></svg>
+        </span>
+    </div>
+
+    <h1 class="page-title">Виды затрат</h1>
+
+    <form action="/breakeven-point/cost-types" method="GET" class="card filter-card">
+        <div class="filter-head">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h8M18 7h2M4 12h2M12 12h8M4 17h10"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>
+            <b>Фильтр по сумме</b>
+            <a class="reset-link" href="/breakeven-point/cost-types">Сбросить</a>
+        </div>
+
+        <div class="chip-row">
+            <button type="submit" name="preset" value="lt50" class="chip {{ if eq .Preset "lt50" }}active{{ end }}">до 50 тыс</button>
+            <button type="submit" name="preset" value="b50_100" class="chip {{ if eq .Preset "b50_100" }}active{{ end }}">50-100 тыс</button>
+            <button type="submit" name="preset" value="gt100" class="chip {{ if eq .Preset "gt100" }}active{{ end }}">от 100 тыс</button>
+        </div>
+
+        <div class="range-row">
+            <input class="field range" type="number" name="amount_from" value="{{ .From }}" placeholder="от">
+            <span class="dash">—</span>
+            <input class="field range" type="number" name="amount_to" value="{{ .To }}" placeholder="до">
+            <button type="submit" class="btn-apply">Применить</button>
+        </div>
+
+        <div class="check-row">
+            <span>Вид затрат:</span>
+            <label class="check {{ if .FixedOn }}on{{ end }}">
+                <input type="checkbox" name="type_fixed" {{ if .FixedOn }}checked{{ end }}> Постоянные
+            </label>
+            <label class="check {{ if .VarOn }}on{{ end }}">
+                <input type="checkbox" name="type_variable" {{ if .VarOn }}checked{{ end }}> Переменные
+            </label>
+        </div>
+    </form>
+
+    <div class="costs-grid">
+        {{ range .Costs }}
+        <a class="cost-card" href="/breakeven-point/feed/{{ .ID }}">
+            <img src="{{ $.MinIO }}{{ .ImageKey }}" alt="{{ .CostName }}">
+            <b class="cost-name">{{ .CostName }}</b>
+            <b class="cost-sum">{{ .AmountText }}</b>
+            <div class="cost-badge">
+                <span class="dot {{ .CostKind }}"></span>
+                <span class="kind-text">{{ .KindLabel }}</span>
+                <span class="share-text">Доля: {{ .CostShare }}%</span>
+            </div>
+        </a>
+        {{ else }}
+        <div class="empty-state">Ничего не найдено. Измените диапазон или галочки.</div>
+        {{ end }}
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="/breakeven-point/feed/1" class="nav-tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h16v12H4z"/><path d="M2 4h20v4H2z"/><path d="M9 12h6"/></svg>
+            Лента
+        </a>
+        <a href="/breakeven-point/addition" class="nav-tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+            Добавление
+        </a>
+        <a href="/breakeven-point/cost-types" class="nav-tab active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
+            Виды затрат
+        </a>
+    </nav>
+</div>
+</body>
+</html>

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Добавление</title>
+    <link rel="stylesheet" href="/static/styles/Break-Even_Point_Calculation_for_a_New_Product.css">
+</head>
+<body>
+<div class="app app-light">
+    <div class="status-bar">
+        <span class="sb-time">9:41</span>
+        <span class="sb-icons">
+            <svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+            <svg viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 4.5a9.5 9.5 0 0 1 13 0"/><path d="M4 7a6 6 0 0 1 8 0"/><path d="M6.5 9.5a2.5 2.5 0 0 1 3 0"/><circle cx="8" cy="11" r="0.8" fill="currentColor" stroke="none"/></svg>
+            <svg viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><path d="M23.5 4v4a2.2 2.2 0 0 0 0-4Z" fill="currentColor" opacity=".45"/></svg>
+        </span>
+    </div>
+
+    <h1 class="page-title">Добавление</h1>
+
+    <form action="/breakeven-point/addition" method="POST">
+        <div class="card">
+            <div class="card-head">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="M3 17l5-4 4 3 4-4 5 5"/></svg>
+                <b>Фото и видео</b>
+            </div>
+            <div class="media-row">
+                <label for="pick-photo" class="media-zone">
+                    <span class="media-ico">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="13" height="12" rx="2"/><path d="M7 7l1.5-2h5L15 7"/><circle cx="9.5" cy="13" r="3"/><path d="M19 5v6M16 8h6"/></svg>
+                    </span>
+                    <span class="media-label">Загрузить фото</span>
+                    <span class="media-preview"><img src="{{ .MinIO }}{{ .SelImage }}" alt="{{ .SelImage }}"></span>
+                    <span class="media-preview-name">{{ .SelImage }}</span>
+                </label>
+                <label for="pick-video" class="media-zone">
+                    <span class="media-ico">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="M15 10l6-3v10l-6-3z"/></svg>
+                    </span>
+                    <span class="media-label">Загрузить видео</span>
+                    <span class="media-preview"><video src="{{ .MinIO }}{{ .SelVideo }}" muted loop playsinline autoplay></video></span>
+                    <span class="media-preview-name">{{ .SelVideo }}</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Модальное окно выбора ФОТО -->
+        <div class="modal-wrap">
+            <input type="checkbox" id="pick-photo" class="modal-toggle">
+            <div class="modal">
+                <div class="modal-box">
+                    <label for="pick-photo" class="modal-close">×</label>
+                    <div class="modal-title">Выберите фото из MinIO</div>
+                    <div class="thumbs">
+                        {{ range .Images }}
+                        <label class="thumb">
+                            <input type="radio" name="image_key" value="{{ . }}" {{ if eq . $.SelImage }}checked{{ end }}>
+                            <img src="{{ $.MinIO }}{{ . }}" alt="{{ . }}">
+                        </label>
+                        {{ end }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Модальное окно выбора ВИДЕО -->
+        <div class="modal-wrap">
+            <input type="checkbox" id="pick-video" class="modal-toggle">
+            <div class="modal">
+                <div class="modal-box">
+                    <label for="pick-video" class="modal-close">×</label>
+                    <div class="modal-title">Выберите видео из MinIO</div>
+                    <div class="thumbs">
+                        {{ range .Videos }}
+                        <label class="thumb">
+                            <input type="radio" name="video_key" value="{{ . }}" {{ if eq . $.SelVideo }}checked{{ end }}>
+                            <video src="{{ $.MinIO }}{{ . }}" muted loop playsinline autoplay></video>
+                        </label>
+                        {{ end }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <b class="card-title">Новый вид затрат</b>
+
+            <label class="field-label">Продукт / услуга / статья затрат</label>
+            <input class="field" type="text" name="cost_name" placeholder="Например: Аренда помещения / Оборудование">
+
+            <label class="field-label">Вид затрат</label>
+            <div class="kind-toggle">
+                <label class="kind kind-fixed">
+                    <input type="radio" name="cost_kind" value="fixed" checked>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+                    Постоянные
+                </label>
+                <label class="kind kind-variable">
+                    <input type="radio" name="cost_kind" value="variable">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l6-6 4 4 7-7"/><path d="M14 8h6v6"/></svg>
+                    Переменные
+                </label>
+            </div>
+
+            <label class="field-label">Описание вида затрат</label>
+            <textarea class="field" name="description" rows="3" placeholder="Краткое описание назначения расходов, условий или регламента..."></textarea>
+
+            <label class="field-label">Нормативное значение</label>
+            <input class="field" type="text" name="amount" placeholder="например: 150 000 ₽ / 15% / мес">
+        </div>
+
+        <button type="submit" class="btn-green">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>
+            Сохранить
+        </button>
+    </form>
+
+    <nav class="bottom-nav">
+        <a href="/breakeven-point/feed/1" class="nav-tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h16v12H4z"/><path d="M2 4h20v4H2z"/><path d="M9 12h6"/></svg>
+            Лента
+        </a>
+        <a href="/breakeven-point/addition" class="nav-tab active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+            Добавление
+        </a>
+        <a href="/breakeven-point/cost-types" class="nav-tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
+            Виды затрат
+        </a>
+    </nav>
+</div>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ .Cost.CostName }}</title>
+    <link rel="stylesheet" href="/static/styles/Break-Even_Point_Calculation_for_a_New_Product.css">
+</head>
+<body>
+<div class="app">
+    <div class="status-bar sb-dark">
+        <span class="sb-time">9:41</span>
+        <span class="sb-icons">
+            <svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="7" width="3" height="5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+            <svg viewBox="0 0 16 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M1.5 4.5a9.5 9.5 0 0 1 13 0"/><path d="M4 7a6 6 0 0 1 8 0"/><path d="M6.5 9.5a2.5 2.5 0 0 1 3 0"/><circle cx="8" cy="11" r="0.8" fill="currentColor" stroke="none"/></svg>
+            <svg viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3" stroke="currentColor" opacity=".45"/><rect x="2" y="2" width="17" height="8" rx="1.5" fill="currentColor"/><path d="M23.5 4v4a2.2 2.2 0 0 0 0-4Z" fill="currentColor" opacity=".45"/></svg>
+        </span>
+    </div>
+
+    <div class="video-bg">
+        <video autoplay muted loop playsinline>
+            <source src="{{ .MinIO }}{{ .Cost.VideoKey }}" type="video/mp4">
+        </video>
+    </div>
+
+    <div class="feed-overlay">
+        <h1 class="feed-title">{{ .Cost.CostName }}</h1>
+        <p class="feed-desc">{{ .Cost.ShortDescription }}…</p>
+
+        <!-- «Еще» раскрывается нативно в браузере: клик = развернуть, повторный = свернуть -->
+        <details class="feed-details">
+            <summary class="more-link">Еще</summary>
+            <p class="feed-full">{{ .Cost.FullDescription }}</p>
+        </details>
+
+        <div class="feed-chips">
+            <div class="feed-chip"><span>СУММА</span><b>{{ .Cost.AmountText }}</b></div>
+            <div class="feed-chip"><span>ДОЛЯ В ЗАТРАТАХ</span><b>{{ .Cost.CostShare }}%</b></div>
+            <div class="feed-chip"><span>ТИП</span><b>{{ .Cost.KindLabel }}</b></div>
+        </div>
+    </div>
+
+    <div class="feed-actions">
+        <form class="round-wrap" action="/breakeven-point/feed/{{ .Cost.ID }}/like" method="POST">
+            <button type="submit" class="round-btn {{ if .Cost.Liked }}liked{{ end }}">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.5-9-9c-1.2-2.8.6-6 3.8-6 2 0 3.4 1.2 5.2 3.4C13.8 6.2 15.2 5 17.2 5c3.2 0 5 3.2 3.8 6-2 4.5-9 9-9 9z"/></svg>
+            </button>
+            <span class="round-label">{{ .Cost.Likes }}</span>
+        </form>
+        <div class="round-wrap">
+            <span class="round-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="M8.2 10.8l6.6-3.6M8.2 13.2l6.6 3.6"/></svg>
+            </span>
+            <span class="round-label">ПОДЕЛИТЬСЯ</span>
+        </div>
+        <a class="round-wrap" href="/breakeven-point/feed/{{ .NextID }}">
+            <span class="round-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M6 13l6 6 6-6"/></svg>
+            </span>
+            <span class="round-label">ДАЛЕЕ</span>
+        </a>
+    </div>
+
+    <nav class="bottom-nav">
+        <a href="/breakeven-point/feed/{{ .Cost.ID }}" class="nav-tab active">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h16v12H4z"/><path d="M2 4h20v4H2z"/><path d="M9 12h6"/></svg>
+            Лента
+        </a>
+        <a href="/breakeven-point/addition" class="nav-tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+            Добавление
+        </a>
+        <a href="/breakeven-point/cost-types" class="nav-tab">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
+            Виды затрат
+        </a>
+    </nav>
+</div>
+</body>
+</html>
