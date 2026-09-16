@@ -2,8 +2,16 @@ package repository
 
 import (
 	"fmt"
+	"math"
 	"strconv"
 	"strings"
+)
+
+
+const (
+	MediaBaseURL    = "http://localhost:9000/media/"
+	DefaultImageKey = "screen.png"
+	DefaultVideoKey = "7426703-hd_1080_1920_25fps.mp4"
 )
 
 type CostType struct {
@@ -21,6 +29,15 @@ type CostType struct {
 	Liked            bool
 }
 
+func (c *CostType) normalizeMedia() {
+	if c.ImageKey == "" {
+		c.ImageKey = MediaBaseURL + DefaultImageKey
+	}
+	if c.VideoKey == "" {
+		c.VideoKey = MediaBaseURL + DefaultVideoKey
+	}
+}
+
 func (c CostType) KindLabel() string {
 	if c.CostKind == "fixed" {
 		return "Постоянные"
@@ -31,9 +48,10 @@ func (c CostType) KindLabel() string {
 func (c CostType) AmountText() string { return formatMoney(int(c.AmountMonthly)) + " ₽/мес" }
 
 type RequestLink struct {
-	CostID  int
-	Volume  int
-	Comment string
+	CostID     int
+	Volume     int
+	IsCritical bool
+	Comment    string
 }
 
 type BreakevenRequest struct {
@@ -62,12 +80,11 @@ func NewRepository() (*Repository, error) {
 			{ID: 4, CostName: "Маркетинг и аналитика", ShortDescription: "Переменные расходы на продвижение, перформанс-кампании и продуктовую аналитику", FullDescription: "Переменные расходы на продвижение, перформанс-кампании и продуктовую аналитику: медиабаинг, сквозная аналитика, A/B-платформы. Планируются от процента выручки, поэтому относятся к переменной части затрат.", IsActive: true, ImageKey: "screen_4.png", VideoKey: "7643847-uhd_2160_4096_25fps.mp4", CostKind: "variable", AmountMonthly: 1150000, CostShare: 10, Likes: 3},
 		},
 		Request: &BreakevenRequest{
-			ID: 1, Status: "черновик", ProductName: "Новая продуктовая линейка",
-			SellingPrice: 1250, BepUnits: 8350, BepRevenue: 10437500,
+			ID: 1, Status: "черновик", ProductName: "Новая продуктовая линейка", SellingPrice: 1250,
 			Links: []RequestLink{
-				{CostID: 1, Volume: 1, Comment: "Офис, контракт на 11 мес."},
-				{CostID: 2, Volume: 1, Comment: "Управленческая команда"},
-				{CostID: 3, Volume: 1, Comment: "Норматив партии"},
+				{CostID: 1, Volume: 1, IsCritical: true, Comment: "Офис, контракт на 11 мес."},
+				{CostID: 2, Volume: 1, IsCritical: true, Comment: "Управленческая команда"},
+				{CostID: 3, Volume: 1, IsCritical: false, Comment: "Норматив партии"},
 			},
 		},
 		MediaImages: []string{"screen.png", "screen_2.png", "screen_3.png", "screen_4.png"},
@@ -92,14 +109,13 @@ func (r *Repository) GetCostTypesFiltered(from, to float64, hasFrom, hasTo, fixe
 		if hasTo && c.AmountMonthly > to {
 			continue
 		}
-		if fixed || variable {
-			if c.CostKind == "fixed" && !fixed {
-				continue
-			}
-			if c.CostKind == "variable" && !variable {
-				continue
-			}
+		if fixed && !variable && c.CostKind != "fixed" {
+			continue
 		}
+		if variable && !fixed && c.CostKind != "variable" {
+			continue
+		}
+		c.normalizeMedia()
 		res = append(res, c)
 	}
 	return res
@@ -108,6 +124,7 @@ func (r *Repository) GetCostTypesFiltered(from, to float64, hasFrom, hasTo, fixe
 func (r *Repository) GetCostTypeByID(id int) (CostType, error) {
 	for _, c := range r.CostTypes {
 		if c.ID == id {
+			c.normalizeMedia()
 			return c, nil
 		}
 	}
@@ -118,29 +135,102 @@ func (r *Repository) GetNextCostID(id int) int { return id%len(r.CostTypes) + 1 
 
 func (r *Repository) GetRequestPositions() int { return len(r.Request.Links) }
 
-// ToggleLike — лайк: сердечко загорается и счётчик растёт (повторно — гаснет).
 func (r *Repository) ToggleLike(id int) {
 	for i := range r.CostTypes {
 		if r.CostTypes[i].ID == id {
+			r.CostTypes[i].Liked = !r.CostTypes[i].Liked
 			if r.CostTypes[i].Liked {
-				r.CostTypes[i].Liked = false
-				r.CostTypes[i].Likes--
-			} else {
-				r.CostTypes[i].Liked = true
 				r.CostTypes[i].Likes++
+			} else {
+				r.CostTypes[i].Likes--
 			}
 			return
 		}
 	}
 }
 
-// AddCostType — «Сохранить заявку» создаёт новую карточку в «Видах затрат».
 func (r *Repository) AddCostType(ct CostType) CostType {
 	ct.ID = len(r.CostTypes) + 1
 	ct.IsActive = true
 	ct.Likes = 0
 	r.CostTypes = append(r.CostTypes, ct)
 	return ct
+}
+
+// Заявка по id (для страницы заявки)
+func (r *Repository) GetRequestByID(id int) (*BreakevenRequest, error) {
+	if r.Request != nil && r.Request.ID == id {
+		return r.Request, nil
+	}
+	return nil, fmt.Errorf("заявка не найдена")
+}
+
+// Логическое удаление заявки (статус → deleted)
+func (r *Repository) DeleteRequest(id int) error {
+	if r.Request == nil || r.Request.ID != id || r.Request.Status != "черновик" {
+		return fmt.Errorf("заявка не найдена или не в статусе черновик")
+	}
+	r.Request.Status = "deleted"
+	return nil
+}
+
+// Добавление услуги в заявку; если черновика нет (или удалён) — создаётся новый
+func (r *Repository) AddCostToRequest(costID, volume int, comment string) error {
+	if r.Request == nil || r.Request.Status == "deleted" {
+		nextID := 1
+		if r.Request != nil {
+			nextID = r.Request.ID + 1
+		}
+		r.Request = &BreakevenRequest{ID: nextID, Status: "черновик", ProductName: "Новая продуктовая линейка", SellingPrice: 1250}
+	}
+	for i := range r.Request.Links {
+		if r.Request.Links[i].CostID == costID {
+			r.Request.Links[i].Volume += volume
+			return nil
+		}
+	}
+	r.Request.Links = append(r.Request.Links, RequestLink{CostID: costID, Volume: volume, Comment: comment})
+	return nil
+}
+
+// Правка поля м-м (объём)
+func (r *Repository) UpdateLinkVolume(costID, volume int) error {
+	if r.Request == nil {
+		return fmt.Errorf("нет заявки")
+	}
+	for i := range r.Request.Links {
+		if r.Request.Links[i].CostID == costID {
+			r.Request.Links[i].Volume = volume
+			return nil
+		}
+	}
+	return fmt.Errorf("связь не найдена")
+}
+
+// ФОРМУЛА: ТБУ(шт) = Пост / (Цена − Перем на ед.); ТБУ(₽) = ТБУ(шт) × Цена
+func (r *Repository) ComputeBreakEven(req *BreakevenRequest) (int, float64) {
+	var fixed, varPerUnit float64
+	for _, l := range req.Links {
+		cost, err := r.GetCostTypeByID(l.CostID)
+		if err != nil {
+			continue
+		}
+		if cost.CostKind == "fixed" {
+			fixed += cost.AmountMonthly
+			continue
+		}
+		vol := l.Volume
+		if vol <= 0 {
+			vol = 1
+		}
+		varPerUnit += cost.AmountMonthly / float64(vol)
+	}
+	margin := req.SellingPrice - varPerUnit
+	if margin <= 0 || fixed <= 0 {
+		return 0, 0
+	}
+	units := int(math.Ceil(fixed / margin))
+	return units, float64(units) * req.SellingPrice
 }
 
 func formatMoney(n int) string {
