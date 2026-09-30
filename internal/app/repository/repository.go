@@ -22,6 +22,7 @@ type User struct {
 	Username string `gorm:"type:varchar(50);uniqueIndex;not null"`
 	Email    string `gorm:"type:varchar(100)"`
 	Role     string `gorm:"type:varchar(20);not null;default:'creator'"`
+	PasswordHash string `gorm:"column:password_hash;type:varchar(100);not null;default:''"`
 }
 
 type CostType struct {
@@ -222,3 +223,41 @@ func (r *Repository) ToggleLike(uid, costID int) error {
 	}
 	return r.DB.Create(&Like{UserID: uid, CostID: costID}).Error
 }
+
+// ===== ЛАБА 3 (API) =====
+
+func (r *Repository) GetCostByID(id int) (CostType, error) {
+	var c CostType
+	return c, r.DB.First(&c, id).Error
+}
+
+func (r *Repository) UpdateCost(id int, updates map[string]interface{}) error {
+	return r.DB.Model(&CostType{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func (r *Repository) SetLike(uid, costID int, set bool) error {
+	if set {
+		var like Like
+		if err := r.DB.Where("user_id = ? AND cost_id = ?", uid, costID).First(&like).Error; err == nil {
+			return nil
+		}
+		return r.DB.Create(&Like{UserID: uid, CostID: costID}).Error
+	}
+	return r.DB.Where("user_id = ? AND cost_id = ?", uid, costID).Delete(&Like{}).Error
+}
+
+func (r *Repository) CreateDraftWithMedia(uid int, name, imageKey, videoKey string) (*CostType, error) {
+	c := CostType{CostName: name, Status: "draft", CreatorID: uid, ImageKey: imageKey, VideoKey: videoKey}
+	if err := r.DB.Create(&c).Error; err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (r *Repository) UsernameExists(name string) bool {
+	var n int64
+	r.DB.Model(&User{}).Where("username = ?", name).Count(&n)
+	return n > 0
+}
+
+func (r *Repository) CreateUser(u *User) error { return r.DB.Create(u).Error }

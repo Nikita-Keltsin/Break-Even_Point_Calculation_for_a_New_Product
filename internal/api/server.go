@@ -3,7 +3,6 @@ package api
 import (
 	"log"
 
-	"Break-Even_Point_Calculation_for_a_New_Product/internal/app/handler"
 	"Break-Even_Point_Calculation_for_a_New_Product/internal/app/repository"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +11,8 @@ import (
 )
 
 func StartServer() {
-	log.Println("Starting server")
+	log.Println("Starting server (lab3 API)")
+
 	dsn := "host=localhost port=5433 user=postgres password=postgres dbname=breakeven_db sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -22,20 +22,30 @@ func StartServer() {
 	if err != nil {
 		log.Println("ошибка инициализации репозитория:", err)
 	}
-	h := handler.NewHandler(repo)
+	mc, err := NewMinIOClient()
+	if err != nil {
+		log.Fatal("Ошибка MinIO:", err)
+	}
+	if err := EnsureBucket(mc); err != nil {
+		log.Println("предупреждение по бакету:", err)
+	}
+	a := &API{Repo: repo, MC: mc}
 
 	r := gin.Default()
-	r.LoadHTMLGlob("templates/*")
-	r.Static("/static", "./resources")
-
-	r.GET("/breakeven-point/feed", h.FeedHandler)
-	r.GET("/breakeven-point/feed/:id", h.FeedHandler)
-	r.GET("/breakeven-point/addition", h.AdditionHandler)
-	r.GET("/breakeven-point/cost-types", h.CostTypesHandler)
-	r.POST("/breakeven-point/draft", h.CreateDraftHandler)
-	r.POST("/breakeven-point/publish", h.PublishHandler)
-	r.POST("/breakeven-point/delete", h.DeleteHandler)
-	r.POST("/breakeven-point/like", h.LikeHandler)
+	apiR := r.Group("/api")
+	{
+		apiR.GET("/costs", a.ListCosts)
+		apiR.GET("/costs/feed", a.FeedCost)
+		apiR.GET("/costs/feed/:id", a.FeedCost)
+		apiR.GET("/costs/draft", a.GetDraft)
+		apiR.POST("/costs", a.CreateCost)
+		apiR.PUT("/costs/:id/publish", a.PublishCost)
+		apiR.DELETE("/costs/:id", a.DeleteCost)
+		apiR.POST("/costs/:id/like", a.LikeCost)
+		apiR.POST("/users/register", a.Register)
+		apiR.POST("/users/login", a.Login)
+		apiR.POST("/users/logout", a.Logout)
+	}
 
 	r.Run()
 	log.Println("Server down")
