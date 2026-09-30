@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>{{ .Cost.CostName }}</title>
     <link rel="stylesheet" href="/static/styles/Break-Even_Point_Calculation_for_a_New_Product.css">
+    <style>.round-btn.liked { color: #E53935; }</style>
 </head>
 <body>
 <div class="app">
@@ -17,34 +18,33 @@
     </div>
 
     <div class="video-bg">
-        <video autoplay muted loop playsinline>
-            <source src="{{ .MinIO }}{{ .Cost.VideoKey }}" type="video/mp4">
-        </video>
+        <video autoplay muted loop playsinline src="{{ .VideoURL }}"
+               onerror="this.onerror=null;this.src='/static/media/default-video.mp4';"></video>
     </div>
 
     <div class="feed-overlay">
         <h1 class="feed-title">{{ .Cost.CostName }}</h1>
-        <p class="feed-desc">{{ .Cost.ShortDescription }}…</p>
-
-        <!-- «Еще» раскрывается нативно в браузере: клик = развернуть, повторный = свернуть -->
-        <details class="feed-details">
-            <summary class="more-link">Еще</summary>
-            <p class="feed-full">{{ .Cost.FullDescription }}</p>
-        </details>
-
+        {{ if .Full }}
+        <p class="feed-desc feed-desc-full">{{ .Cost.FullDescription }}</p>
+        <a class="more-link" href="/breakeven-point/feed/{{ .Cost.ID }}">Свернуть</a>
+        {{ else }}
+        <p class="feed-desc">{{ .Cost.ShortDescription }}</p>
+        <a class="more-link" href="/breakeven-point/feed/{{ .Cost.ID }}?full=1">Еще</a>
+        {{ end }}
         <div class="feed-chips">
             <div class="feed-chip"><span>СУММА</span><b>{{ .Cost.AmountText }}</b></div>
-            <div class="feed-chip"><span>ДОЛЯ В ЗАТРАТАХ</span><b>{{ .Cost.CostShare }}%</b></div>
-            <div class="feed-chip"><span>ТИП</span><b>{{ .Cost.KindLabel }}</b></div>
+            <div class="feed-chip"><span>ВИД ЗАТРАТ</span><b>{{ .Cost.KindLabel }}</b></div>
         </div>
     </div>
 
     <div class="feed-actions">
-        <form class="round-wrap" action="/breakeven-point/feed/{{ .Cost.ID }}/like" method="POST">
-            <button type="submit" class="round-btn {{ if .Cost.Liked }}liked{{ end }}">
+        <form class="round-wrap" action="/breakeven-point/like" method="POST">
+            <input type="hidden" name="cost_id" value="{{ .Cost.ID }}">
+            <input type="hidden" name="full" value="{{ if .Full }}1{{ else }}0{{ end }}">
+            <button type="submit" class="round-btn {{ if .Liked }}liked{{ end }}">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.5-9-9c-1.2-2.8.6-6 3.8-6 2 0 3.4 1.2 5.2 3.4C13.8 6.2 15.2 5 17.2 5c3.2 0 5 3.2 3.8 6-2 4.5-9 9-9 9z"/></svg>
             </button>
-            <span class="round-label">{{ .Cost.Likes }}</span>
+            <span class="round-label">{{ .Likes }}</span>
         </form>
         <div class="round-wrap">
             <span class="round-btn">
@@ -61,15 +61,15 @@
     </div>
 
     <nav class="bottom-nav">
-        <a href="/breakeven-point/feed/{{ .Cost.ID }}" class="nav-tab active">
+        <a href="/breakeven-point/feed" class="nav-tab {{ if eq .Page "feed" }}active{{ end }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 8h16v12H4z"/><path d="M2 4h20v4H2z"/><path d="M9 12h6"/></svg>
             Лента
         </a>
-        <a href="/breakeven-point/addition" class="nav-tab">
+        <a href="/breakeven-point/addition" class="nav-tab {{ if eq .Page "addition" }}active{{ end }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
             Добавление
         </a>
-        <a href="/breakeven-point/cost-types" class="nav-tab">
+        <a href="/breakeven-point/cost-types" class="nav-tab {{ if eq .Page "costs" }}active{{ end }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/></svg>
             Виды затрат
         </a>
