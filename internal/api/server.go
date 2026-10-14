@@ -3,6 +3,7 @@ package api
 import (
 	"log"
 
+	"Break-Even_Point_Calculation_for_a_New_Product/internal/app/handler"
 	"Break-Even_Point_Calculation_for_a_New_Product/internal/app/repository"
 
 	"github.com/gin-gonic/gin"
@@ -11,7 +12,7 @@ import (
 )
 
 func StartServer() {
-	log.Println("Starting server (lab3 API)")
+	log.Println("Starting server breakeven_point")
 
 	dsn := "host=localhost port=5433 user=postgres password=postgres dbname=breakeven_db sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -29,24 +30,42 @@ func StartServer() {
 	if err := EnsureBucket(mc); err != nil {
 		log.Println("предупреждение по бакету:", err)
 	}
-	a := &API{Repo: repo, MC: mc}
 
 	r := gin.Default()
+
+	// ---------- ЛР-2: SSR-страницы (6 HTTP-методов) ----------
+	h := handler.NewHandler(repo)
+	r.LoadHTMLGlob("templates/*")
+	r.Static("/static", "./resources")
+
+	r.GET("/breakeven-point/cost-types", h.CostTypesHandler)
+	r.GET("/breakeven-point/feed", h.FeedHandler)
+	r.GET("/breakeven-point/feed/:id", h.FeedHandler)
+	r.GET("/breakeven-point/addition", h.AdditionHandler)
+	r.POST("/breakeven-point/draft", h.CreateDraftHandler)
+	r.POST("/breakeven-point/publish", h.PublishHandler)
+	r.POST("/breakeven-point/delete", h.DeleteHandler)
+
+	// ---------- ЛР-3: веб-сервис REST API (10 методов) ----------
+	a := &API{Repo: repo, MC: mc}
 	apiR := r.Group("/api")
 	{
-		apiR.GET("/costs", a.ListCosts)
-		apiR.GET("/costs/feed", a.FeedCost)
-		apiR.GET("/costs/feed/:id", a.FeedCost)
-		apiR.GET("/costs/draft", a.GetDraft)
-		apiR.POST("/costs", a.CreateCost)
-		apiR.PUT("/costs/:id/publish", a.PublishCost)
-		apiR.DELETE("/costs/:id", a.DeleteCost)
-		apiR.POST("/costs/:id/like", a.LikeCost)
-		apiR.POST("/users/register", a.Register)
-		apiR.POST("/users/login", a.Login)
-		apiR.POST("/users/logout", a.Logout)
+		bep := apiR.Group("/breakeven_point") // домен breakeven_point (услуга — вид затрат)
+		bep.GET("", a.ListCosts)
+		bep.GET("/feed", a.FeedCost)
+		bep.GET("/feed/:id", a.FeedCost)
+		bep.GET("/draft", a.GetDraft)
+		bep.POST("", a.CreateCost)
+		bep.PUT("/:id/publish", a.PublishCost)
+		bep.DELETE("/:id", a.DeleteCost)
+		bep.POST("/:id/like", a.LikeCost)
+
+		users := apiR.Group("/users") // домен users
+		users.POST("/register", a.Register)
+		users.POST("/login", a.Login)
+		users.POST("/logout", a.Logout)
 	}
 
-	r.Run()
+	r.Run() // :8080
 	log.Println("Server down")
 }

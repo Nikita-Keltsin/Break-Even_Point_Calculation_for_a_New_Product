@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"Break-Even_Point_Calculation_for_a_New_Product/internal/app/repository"
@@ -14,14 +15,31 @@ import (
 	"github.com/minio/minio-go/v7"
 )
 
-// Функция-singleton: пользователь-создатель зафиксирован константой
-const currentUserID = 1
+// ===== Функция-singleton: пользователь-создатель зафиксирован константой (до ЛР-4) =====
 
-func CurrentUserID() uint { return currentUserID }
+const creatorID = 1
+
+var (
+	currentUserOnce sync.Once
+	currentUser     int
+)
+
+// CurrentUserID — singleton: значение вычисляется один раз и используется во всех методах
+func CurrentUserID() int {
+	currentUserOnce.Do(func() { currentUser = creatorID })
+	return currentUser
+}
 
 type API struct {
 	Repo *repository.Repository
 	MC   *minio.Client
+}
+
+func boolTo01(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func (a *API) fullURL(key string) string {
@@ -34,63 +52,72 @@ func (a *API) fullURL(key string) string {
 	return "http://" + minioEndpoint + "/" + BucketName + "/" + key
 }
 
-func (a *API) toCostJSON(c repository.CostType) CostJSON {
-	return CostJSON{
-		ID:            c.ID,
-		CostName:      c.CostName,
-		ShortDesc:     c.ShortDescription,
-		FullDesc:      c.FullDescription,
-		ImageKey:      c.ImageKey,
-		VideoKey:      c.VideoKey,
-		AmountMonthly: c.AmountMonthly,
-		CostKind:      c.CostKind,
-		CreatorID:     c.CreatorID,
-		CreatedAt:     c.CreatedAt,
-		FormedAt:      c.FormedAt,
-		ImageURL:      a.fullURL(c.ImageKey),
-		VideoURL:      a.fullURL(c.VideoKey),
-		LikesCount:    a.Repo.GetLikesCount(c.ID),
-		IsMine:        c.CreatorID == currentUserID,
-		IsLiked:       a.Repo.HasLiked(currentUserID, c.ID),
+func (a *API) toCostJSON(c repository.BreakEvenType) BreakEvenTypeJSON {
+	uid := CurrentUserID()
+	return BreakEvenTypeJSON{
+		ID:               c.ID,
+		CostName:         c.CostName,
+		ShortDescription: c.ShortDescription,
+		ImageURL:         a.fullURL(c.ImageURL),
+		VideoURL:         a.fullURL(c.VideoURL),
+		AmountMonthly:    c.AmountMonthly,
+		IsFixed:          c.IsFixed,
+		CreatorID:        c.CreatorID,
+		CreatedAt:        c.CreatedAt,
+		FormedAt:         c.FormedAt,
+		LikesCount:       a.Repo.GetLikesCount(c.ID),
+		Like:             boolTo01(a.Repo.HasLiked(uid, c.ID)),
+		IsMine:           boolTo01(c.CreatorID == uid),
 	}
 }
 
-// 1. GET /api/costs — список опубликованных, фильтрация на бэкенде
+// ===================== ДОМЕН «УСЛУГА» (/api/breakeven_point) =====================
+
+// 1. GET /api/breakeven_point?min_amount=&max_amount=&is_fixed=0|1 — список опубликованных, фильтр на бэкенде
 func (a *API) ListCosts(ctx *gin.Context) {
 	from, err1 := strconv.ParseFloat(ctx.Query("min_amount"), 64)
 	to, err2 := strconv.ParseFloat(ctx.Query("max_amount"), 64)
 	hasFrom := err1 == nil && ctx.Query("min_amount") != ""
 	hasTo := err2 == nil && ctx.Query("max_amount") != ""
-	kind := ctx.Query("kind")
-	costs, err := a.Repo.GetPublishedCosts(from, to, hasFrom, hasTo, kind == "fixed", kind == "variable")
+	kind := ""
+	switch ctx.Query("is_fixed") {
+	case "1", "true":
+		kind = "fixed"
+	case "0", "false":
+		kind = "variable"
+	}
+	costs, err := a.Repo.GetPublishedCosts(from, to, hasFrom, hasTo, kind)
 	if err != nil {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	res := make([]CostJSON, 0, len(costs))
+	res := make([]BreakEvenTypeJSON, 0, len(costs))
 	for _, c := range costs {
 		res = append(res, a.toCostJSON(c))
 	}
 	ctx.JSON(http.StatusOK, res)
 }
 
-// 2. GET /api/costs/feed и /api/costs/feed/:id?next=true
+//  2. GET /api/breakeven_point/feed            — первая опубликованная (без id)
+//     GET /api/breakeven_point/feed/:id        — опубликованная по id
+//     GET /api/breakeven_point/feed/:id?next=1 — следующая после id (next=true тоже принимается)
+//
+// Из БД всегда читается одна строка; в ответе like=0/1 для текущего пользователя.
 func (a *API) FeedCost(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	if idStr == "" {
-		c, err := a.Repo.GetFeedCost(0)
-		if err != nil {
-			ctx.Status(http.StatusNotFound)
-			return
-		}
-		ctx.JSON(http.StatusOK, a.toCostJSON(c))
-		return
+		idStr = ctx.Query("id") // GET /api/breakeven_point/feed?id=1&next=true
 	}
 	id, _ := strconv.Atoi(idStr)
-	if ctx.Query("next") == "true" {
-		id = a.Repo.GetNextPublishedID(id) // в конце ленты заворот на первую
+	var (
+		c   repository.BreakEvenType
+		err error
+	)
+	if next := ctx.Query("next"); id > 0 && (next == "1" || next == "true") {
+		c, err = a.Repo.GetNextFeedCost(id)
+	} else {
+		c, err = a.Repo.GetFeedCost(id)
 	}
-	c, err := a.Repo.GetFeedCost(id)
 	if err != nil {
 		ctx.Status(http.StatusNotFound)
 		return
@@ -98,9 +125,9 @@ func (a *API) FeedCost(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, a.toCostJSON(c))
 }
 
-// 3. GET /api/costs/draft — черновик текущего пользователя, id с клиента не передаётся
+// 3. GET /api/breakeven_point/draft — черновик текущего пользователя (не более одного), id не передаётся
 func (a *API) GetDraft(ctx *gin.Context) {
-	draft, err := a.Repo.GetDraftByUser(currentUserID)
+	draft, err := a.Repo.GetDraftByUser(CurrentUserID())
 	if err != nil {
 		ctx.Status(http.StatusNotFound)
 		return
@@ -108,9 +135,11 @@ func (a *API) GetDraft(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, a.toCostJSON(*draft))
 }
 
-// 4. POST /api/costs — черновик + файлы image/video в MinIO (multipart)
+// 4. POST /api/breakeven_point — создание черновика: name + файлы image и video (multipart/form-data).
+// Файлы кладутся в MinIO под латинскими именами, имена сохраняются в image_url/video_url.
 func (a *API) CreateCost(ctx *gin.Context) {
-	if _, err := a.Repo.GetDraftByUser(currentUserID); err == nil {
+	uid := CurrentUserID()
+	if _, err := a.Repo.GetDraftByUser(uid); err == nil {
 		ctx.Status(http.StatusConflict) // не более одного черновика
 		return
 	}
@@ -122,17 +151,17 @@ func (a *API) CreateCost(ctx *gin.Context) {
 	imageKey, videoKey := "", ""
 	if f, h, err := ctx.Request.FormFile("image"); err == nil {
 		defer f.Close()
-		if key, uerr := UploadFile(a.MC, currentUserID, f, h.Filename, h.Header.Get("Content-Type")); uerr == nil {
+		if key, uerr := UploadFile(a.MC, uid, "image", f, h.Filename, h.Header.Get("Content-Type")); uerr == nil {
 			imageKey = key
 		}
 	}
 	if f, h, err := ctx.Request.FormFile("video"); err == nil {
 		defer f.Close()
-		if key, uerr := UploadFile(a.MC, currentUserID, f, h.Filename, h.Header.Get("Content-Type")); uerr == nil {
+		if key, uerr := UploadFile(a.MC, uid, "video", f, h.Filename, h.Header.Get("Content-Type")); uerr == nil {
 			videoKey = key
 		}
 	}
-	c, err := a.Repo.CreateDraftWithMedia(currentUserID, name, imageKey, videoKey)
+	c, err := a.Repo.CreateDraftWithMedia(uid, name, imageKey, videoKey)
 	if err != nil {
 		ctx.Status(http.StatusInternalServerError)
 		return
@@ -140,15 +169,15 @@ func (a *API) CreateCost(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, a.toCostJSON(*c))
 }
 
-// 5. PUT /api/costs/:id/publish — только draft→published, только свой; назад в черновик нельзя
+// 5. PUT /api/breakeven_point/:id/publish — draft → published (только свой черновик; обратно нельзя)
 func (a *API) PublishCost(ctx *gin.Context) {
 	id, _ := strconv.Atoi(ctx.Param("id"))
 	c, err := a.Repo.GetCostByID(id)
-	if err != nil {
+	if err != nil || c.Status == "deleted" {
 		ctx.Status(http.StatusNotFound)
 		return
 	}
-	if c.CreatorID != currentUserID || c.Status != "draft" {
+	if c.CreatorID != CurrentUserID() || c.Status != "draft" {
 		ctx.Status(http.StatusForbidden)
 		return
 	}
@@ -159,15 +188,10 @@ func (a *API) PublishCost(ctx *gin.Context) {
 	}
 	updates := map[string]interface{}{
 		"short_description": body.ShortDescription,
-		"full_description":  body.FullDescription,
+		"amount_monthly":    *body.AmountMonthly,
+		"is_fixed":          *body.IsFixed,
 		"status":            "published",
 		"formed_at":         time.Now(),
-	}
-	if body.AmountMonthly != nil {
-		updates["amount_monthly"] = *body.AmountMonthly
-	}
-	if body.CostKind != nil {
-		updates["cost_kind"] = *body.CostKind
 	}
 	if err := a.Repo.UpdateCost(id, updates); err != nil {
 		ctx.Status(http.StatusInternalServerError)
@@ -177,48 +201,51 @@ func (a *API) PublishCost(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, a.toCostJSON(c))
 }
 
-// 6. DELETE /api/costs/:id — только soft delete, только своя услуга
+// 6. DELETE /api/breakeven_point/:id — только soft delete своей услуги (status = 'deleted', ORM)
 func (a *API) DeleteCost(ctx *gin.Context) {
 	id, _ := strconv.Atoi(ctx.Param("id"))
 	c, err := a.Repo.GetCostByID(id)
-	if err != nil {
+	if err != nil || c.Status == "deleted" {
 		ctx.Status(http.StatusNotFound)
 		return
 	}
-	if c.CreatorID != currentUserID {
+	if c.CreatorID != CurrentUserID() {
 		ctx.Status(http.StatusForbidden)
 		return
 	}
-	if err := a.Repo.DeleteCostSQL(id); err != nil { // SQL UPDATE через курсор, без ORM
+	if err := a.Repo.SoftDeleteCost(id); err != nil {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
 	ctx.Status(http.StatusOK)
 }
 
-// 7. POST /api/costs/:id/like — {"like":1} ставит, {"like":0} отменяет
+// 7. POST /api/breakeven_point/:id/like — {"like":1} ставит лайк, {"like":0} отменяет
 func (a *API) LikeCost(ctx *gin.Context) {
 	id, _ := strconv.Atoi(ctx.Param("id"))
-	if _, err := a.Repo.GetCostByID(id); err != nil {
+	c, err := a.Repo.GetCostByID(id)
+	if err != nil || c.Status != "published" {
 		ctx.Status(http.StatusNotFound)
 		return
 	}
 	var body LikeRequest
-	if err := ctx.ShouldBindJSON(&body); err != nil || (body.Like != 0 && body.Like != 1) {
+	if err := ctx.ShouldBindJSON(&body); err != nil || (*body.Like != 0 && *body.Like != 1) {
 		ctx.Status(http.StatusBadRequest)
 		return
 	}
-	if err := a.Repo.SetLike(currentUserID, id, body.Like == 1); err != nil {
+	if err := a.Repo.SetLike(CurrentUserID(), id, *body.Like == 1); err != nil {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	ctx.Status(http.StatusOK)
+	ctx.JSON(http.StatusOK, gin.H{"like": *body.Like, "likes_count": a.Repo.GetLikesCount(id)})
 }
 
-// 8. POST /api/users/register — 201 + {id, username}; 409 если логин занят
+// ===================== ДОМЕН «ПОЛЬЗОВАТЕЛЬ» (/api/users) =====================
+
+// 8. POST /api/users/register — {username, password} → 201 {id, username}; 409 если логин занят
 func (a *API) Register(ctx *gin.Context) {
 	var body RegisterRequest
-	if err := ctx.ShouldBindJSON(&body); err != nil || body.Username == "" || body.Password == "" {
+	if err := ctx.ShouldBindJSON(&body); err != nil {
 		ctx.Status(http.StatusBadRequest)
 		return
 	}
@@ -235,6 +262,8 @@ func (a *API) Register(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, UserJSON{ID: u.ID, Username: u.Username})
 }
 
-// 9-10. Заглушки для ЛР4
-func (a *API) Login(ctx *gin.Context)  { ctx.JSON(http.StatusOK, gin.H{}) }
-func (a *API) Logout(ctx *gin.Context) { ctx.JSON(http.StatusOK, gin.H{}) }
+// 9. POST /api/users/login — заглушка аутентификации (реализуется в ЛР-4)
+func (a *API) Login(ctx *gin.Context) { ctx.Status(http.StatusOK) }
+
+// 10. POST /api/users/logout — заглушка деавторизации (реализуется в ЛР-4)
+func (a *API) Logout(ctx *gin.Context) { ctx.Status(http.StatusOK) }
