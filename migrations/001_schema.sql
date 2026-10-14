@@ -5,7 +5,7 @@
 DROP TABLE IF EXISTS request_cost_links;
 DROP TABLE IF EXISTS bep_requests;
 
-DROP TABLE IF EXISTS likes, breakeven_types, users;
+DROP TABLE IF EXISTS likes, cost_types, breakeven_types, users;  -- cost_types — старая таблица ЛР-3
 
 -- Пользователи
 CREATE TABLE users (
