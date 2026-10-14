@@ -20,6 +20,12 @@ services:
     ports: ["5433:5432"]
     volumes: [postgres_data:/var/lib/postgresql/data]
 
+  redis:
+    container_name: redis_store
+    image: redis:7.2-alpine
+    command: redis-server --requirepass redispassword
+    ports: ["6379:6379"]
+
   adminer:
     container_name: adminer_ui
     image: adminer:latest

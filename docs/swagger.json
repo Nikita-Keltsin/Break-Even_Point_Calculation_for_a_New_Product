@@ -1,0 +1,589 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "Веб-сервис расчёта точки безубыточности нового продукта: виды затрат (домен breakeven_point) и пользователи (домен users).",
+        "title": "breakeven_point API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/api/breakeven_point": {
+            "get": {
+                "description": "Только опубликованные. Фильтрация на бэкенде. Доступно всем; с токеном заполняются like и is_mine.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakeven_point"
+                ],
+                "summary": "Список видов затрат с фильтром",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "Сумма от, ₽/мес",
+                        "name": "min_amount",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Сумма до, ₽/мес",
+                        "name": "max_amount",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            0,
+                            1
+                        ],
+                        "type": "integer",
+                        "description": "1 — постоянные, 0 — переменные",
+                        "name": "is_fixed",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/api.BreakEvenTypeJSON"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Файлы сохраняются в MinIO под латинскими именами; создатель — пользователь из JWT. Доступно создателю.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakeven_point"
+                ],
+                "summary": "Создать вид затрат (черновик) с фото и видео",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Название",
+                        "name": "name",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "Фото",
+                        "name": "image",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Видео",
+                        "name": "video",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/api.BreakEvenTypeJSON"
+                        }
+                    },
+                    "400": {
+                        "description": "нет названия"
+                    },
+                    "401": {
+                        "description": "нет токена"
+                    },
+                    "409": {
+                        "description": "черновик уже есть"
+                    }
+                }
+            }
+        },
+        "/api/breakeven_point/draft": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Не более одного черновика у пользователя, id не передаётся. Доступно создателю.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakeven_point"
+                ],
+                "summary": "Черновик текущего пользователя",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.BreakEvenTypeJSON"
+                        }
+                    },
+                    "401": {
+                        "description": "нет токена"
+                    },
+                    "404": {
+                        "description": "черновика нет"
+                    }
+                }
+            }
+        },
+        "/api/breakeven_point/feed": {
+            "get": {
+                "description": "Без id — первый опубликованный; с id — по id; с id и next=true — следующий после id. Доступно всем.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakeven_point"
+                ],
+                "summary": "Лента: один вид затрат",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id вида затрат",
+                        "name": "id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "true — следующий после id",
+                        "name": "next",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.BreakEvenTypeJSON"
+                        }
+                    },
+                    "404": {
+                        "description": "не найден или удалён"
+                    }
+                }
+            }
+        },
+        "/api/breakeven_point/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "breakeven_point"
+                ],
+                "summary": "Удалить свой вид затрат (soft delete)",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id вида затрат",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "статус deleted"
+                    },
+                    "401": {
+                        "description": "нет токена"
+                    },
+                    "403": {
+                        "description": "чужая карточка"
+                    },
+                    "404": {
+                        "description": "не найдена"
+                    }
+                }
+            }
+        },
+        "/api/breakeven_point/{id}/like": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "like = 1 ставит лайк текущего пользователя, like = 0 отменяет. Доступно создателю.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakeven_point"
+                ],
+                "summary": "Поставить или отменить лайк",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id вида затрат",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "0 или 1",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.LikeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.LikeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "like не 0 и не 1"
+                    },
+                    "401": {
+                        "description": "нет токена"
+                    },
+                    "404": {
+                        "description": "не найдена"
+                    }
+                }
+            }
+        },
+        "/api/breakeven_point/{id}/publish": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "draft → published: краткое описание и 2 поля по теме, formed_at. Вернуть в черновик нельзя. Доступно создателю.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakeven_point"
+                ],
+                "summary": "Опубликовать свой черновик",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "id черновика",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Краткое описание и 2 поля по теме",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.PublishRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.BreakEvenTypeJSON"
+                        }
+                    },
+                    "400": {
+                        "description": "неверное тело запроса"
+                    },
+                    "401": {
+                        "description": "нет токена"
+                    },
+                    "403": {
+                        "description": "чужая карточка или не черновик"
+                    },
+                    "404": {
+                        "description": "не найдена"
+                    }
+                }
+            }
+        },
+        "/api/users/login": {
+            "post": {
+                "description": "Проверяет логин и пароль (bcrypt) и выдаёт JWT. Доступно всем.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Аутентификация пользователя",
+                "parameters": [
+                    {
+                        "description": "Логин и пароль",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "неверный формат запроса"
+                    },
+                    "401": {
+                        "description": "неверный логин или пароль"
+                    }
+                }
+            }
+        },
+        "/api/users/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Кладёт текущий JWT в blacklist Redis до окончания срока его действия. Доступно создателю.",
+                "tags": [
+                    "users"
+                ],
+                "summary": "Деавторизация пользователя",
+                "responses": {
+                    "200": {
+                        "description": "токен отозван"
+                    },
+                    "401": {
+                        "description": "нет токена или токен недействителен"
+                    }
+                }
+            }
+        },
+        "/api/users/register": {
+            "post": {
+                "description": "Пароль хранится bcrypt-хэшем. Доступно всем.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Регистрация пользователя",
+                "parameters": [
+                    {
+                        "description": "Логин и пароль",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/api.RegisterRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/api.UserJSON"
+                        }
+                    },
+                    "400": {
+                        "description": "неверное тело запроса"
+                    },
+                    "409": {
+                        "description": "логин занят"
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "api.BreakEvenTypeJSON": {
+            "type": "object",
+            "properties": {
+                "amount_monthly": {
+                    "type": "number"
+                },
+                "cost_name": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "creator_id": {
+                    "type": "integer"
+                },
+                "formed_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "description": "\"\" → клиент показывает фото по умолчанию",
+                    "type": "string"
+                },
+                "is_fixed": {
+                    "type": "boolean"
+                },
+                "is_mine": {
+                    "description": "0/1 — карточка текущего пользователя",
+                    "type": "integer"
+                },
+                "like": {
+                    "description": "0/1 — поставил ли текущий пользователь лайк",
+                    "type": "integer"
+                },
+                "likes_count": {
+                    "type": "integer"
+                },
+                "short_description": {
+                    "type": "string"
+                },
+                "video_url": {
+                    "description": "\"\" → клиент показывает видео по умолчанию",
+                    "type": "string"
+                }
+            }
+        },
+        "api.LikeRequest": {
+            "type": "object",
+            "required": [
+                "like"
+            ],
+            "properties": {
+                "like": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.LikeResponse": {
+            "type": "object",
+            "properties": {
+                "like": {
+                    "type": "integer"
+                },
+                "likes_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "api.LoginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "token_type": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.PublishRequest": {
+            "type": "object",
+            "required": [
+                "amount_monthly",
+                "is_fixed",
+                "short_description"
+            ],
+            "properties": {
+                "amount_monthly": {
+                    "type": "number"
+                },
+                "is_fixed": {
+                    "type": "boolean"
+                },
+                "short_description": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "api.UserJSON": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Введите: Bearer \u003caccess_token из POST /api/users/login\u003e",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

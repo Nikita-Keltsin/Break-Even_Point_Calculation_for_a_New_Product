@@ -257,4 +257,10 @@ body { background: #E3E6EB; }
     border-radius: 50%; background: #2285C8; border: none; cursor: pointer; }
 .dual-range input[type=range]::-moz-range-track { background: none; }
 .media-zone { cursor: pointer; }
-.cost-card a, .cost-card a:visited { color: #1F2937; text-decoration: none; }
+.cost-card a, .cost-card a:visited { color: #1F2937; text-decoration: none; }/* ================= PATCH v6 (замечания ЛР-2) ================= */
+/* Поле по теме «Постоянные затраты» — настоящая галочка (checkbox) */
+.checkbox-field { display: flex; align-items: center; gap: 10px; margin-top: 14px;
+                  font-size: 14px; color: #1F2937; cursor: pointer; }
+.checkbox-field input[type="checkbox"] { width: 20px; height: 20px; accent-color: #2285C8;
+                  flex: none; cursor: pointer; }
+.field[readonly] { background: #EDF0F5; color: #6B7280; }

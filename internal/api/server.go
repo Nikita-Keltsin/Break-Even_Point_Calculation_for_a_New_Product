@@ -1,12 +1,17 @@
 package api
 
 import (
+	"context"
 	"log"
 
 	"Break-Even_Point_Calculation_for_a_New_Product/internal/app/handler"
 	"Break-Even_Point_Calculation_for_a_New_Product/internal/app/repository"
 
+	_ "Break-Even_Point_Calculation_for_a_New_Product/docs" // сгенерировано swag init
+
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -31,6 +36,12 @@ func StartServer() {
 		log.Println("предупреждение по бакету:", err)
 	}
 
+	// ЛР-4: Redis — чёрный список отозванных JWT
+	rdb := NewRedisClient()
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		log.Fatal("Ошибка Redis:", err)
+	}
+
 	r := gin.Default()
 
 	// ---------- ЛР-2: SSR-страницы (6 HTTP-методов) ----------
@@ -46,25 +57,31 @@ func StartServer() {
 	r.POST("/breakeven-point/publish", h.PublishHandler)
 	r.POST("/breakeven-point/delete", h.DeleteHandler)
 
-	// ---------- ЛР-3: веб-сервис REST API (10 методов) ----------
-	a := &API{Repo: repo, MC: mc}
+	// ---------- ЛР-3 + ЛР-4: веб-сервис REST API (10 методов) с авторизацией ----------
+	a := &API{Repo: repo, MC: mc, RDB: rdb}
 	apiR := r.Group("/api")
 	{
 		bep := apiR.Group("/breakeven_point") // домен breakeven_point (услуга — вид затрат)
-		bep.GET("", a.ListCosts)
-		bep.GET("/feed", a.FeedCost)
-		bep.GET("/feed/:id", a.FeedCost)
-		bep.GET("/draft", a.GetDraft)
-		bep.POST("", a.CreateCost)
-		bep.PUT("/:id/publish", a.PublishCost)
-		bep.DELETE("/:id", a.DeleteCost)
-		bep.POST("/:id/like", a.LikeCost)
+		// гость и создатель: только чтение (с токеном заполняются like и is_mine)
+		bep.GET("", a.WithOptionalAuth, a.ListCosts)
+		bep.GET("/feed", a.WithOptionalAuth, a.FeedCost)
+		bep.GET("/feed/:id", a.WithOptionalAuth, a.FeedCost)
+		// только создатель (JWT обязателен, иначе 401)
+		creator := bep.Group("", a.WithAuth)
+		creator.GET("/draft", a.GetDraft)
+		creator.POST("", a.CreateCost)
+		creator.PUT("/:id/publish", a.PublishCost)
+		creator.DELETE("/:id", a.DeleteCost)
+		creator.POST("/:id/like", a.LikeCost)
 
 		users := apiR.Group("/users") // домен users
 		users.POST("/register", a.Register)
 		users.POST("/login", a.Login)
-		users.POST("/logout", a.Logout)
+		users.POST("/logout", a.WithAuth, a.Logout)
 	}
+
+	// ЛР-4: Swagger — http://localhost:8080/swagger/index.html
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	r.Run() // :8080
 	log.Println("Server down")

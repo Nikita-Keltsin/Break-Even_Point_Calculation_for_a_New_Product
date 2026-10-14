@@ -44,3 +44,22 @@ type PublishRequest struct {
 	AmountMonthly    *float64 `json:"amount_monthly" binding:"required"`
 	IsFixed          *bool    `json:"is_fixed" binding:"required"`
 }
+
+// LikeResponse — ответ POST /api/breakeven_point/:id/like
+type LikeResponse struct {
+	Like       int   `json:"like"`
+	LikesCount int64 `json:"likes_count"`
+}
+
+// LoginRequest — POST /api/users/login
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+// LoginResponse — JWT для заголовка Authorization: Bearer <access_token>
+type LoginResponse struct {
+	AccessToken string `json:"access_token"`
+	TokenType   string `json:"token_type"`
+	ExpiresIn   int    `json:"expires_in"`
+}

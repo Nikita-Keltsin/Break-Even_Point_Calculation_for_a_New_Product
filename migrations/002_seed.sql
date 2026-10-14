@@ -1,9 +1,9 @@
 -- breakeven_point: тестовые данные
--- пароль у всех пользователей: 123456 (sha256)
+-- пароль у всех пользователей: 123456 (bcrypt, ЛР-4)
 INSERT INTO users (username, password_hash, email, role) VALUES
-('ivanov',   '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', 'ivanov@company.ru',   'creator'),
-('petrov',   '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', 'petrov@company.ru',   'moderator'),
-('sidorova', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', 'sidorova@company.ru', 'creator');
+('ivanov',   '$2a$10$Bc8jFFkFDV39Ehb2qwmfH.GFFtiuUF8t78gnYFKs2E83BnePgiEh6', 'ivanov@company.ru',   'creator'),
+('petrov',   '$2a$10$Bc8jFFkFDV39Ehb2qwmfH.GFFtiuUF8t78gnYFKs2E83BnePgiEh6', 'petrov@company.ru',   'moderator'),
+('sidorova', '$2a$10$Bc8jFFkFDV39Ehb2qwmfH.GFFtiuUF8t78gnYFKs2E83BnePgiEh6', 'sidorova@company.ru', 'creator');
 
 -- обязательно есть все три статуса: опубликован, удалён, черновик
 INSERT INTO breakeven_types (cost_name, short_description, status, image_url, video_url, amount_monthly, is_fixed, creator_id, formed_at) VALUES

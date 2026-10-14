@@ -1,0 +1,389 @@
+basePath: /
+definitions:
+  api.BreakEvenTypeJSON:
+    properties:
+      amount_monthly:
+        type: number
+      cost_name:
+        type: string
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      formed_at:
+        type: string
+      id:
+        type: integer
+      image_url:
+        description: '"" → клиент показывает фото по умолчанию'
+        type: string
+      is_fixed:
+        type: boolean
+      is_mine:
+        description: 0/1 — карточка текущего пользователя
+        type: integer
+      like:
+        description: 0/1 — поставил ли текущий пользователь лайк
+        type: integer
+      likes_count:
+        type: integer
+      short_description:
+        type: string
+      video_url:
+        description: '"" → клиент показывает видео по умолчанию'
+        type: string
+    type: object
+  api.LikeRequest:
+    properties:
+      like:
+        type: integer
+    required:
+    - like
+    type: object
+  api.LikeResponse:
+    properties:
+      like:
+        type: integer
+      likes_count:
+        type: integer
+    type: object
+  api.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  api.LoginResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+      token_type:
+        type: string
+    type: object
+  api.PublishRequest:
+    properties:
+      amount_monthly:
+        type: number
+      is_fixed:
+        type: boolean
+      short_description:
+        type: string
+    required:
+    - amount_monthly
+    - is_fixed
+    - short_description
+    type: object
+  api.RegisterRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  api.UserJSON:
+    properties:
+      id:
+        type: integer
+      username:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: 'Веб-сервис расчёта точки безубыточности нового продукта: виды затрат
+    (домен breakeven_point) и пользователи (домен users).'
+  title: breakeven_point API
+  version: "1.0"
+paths:
+  /api/breakeven_point:
+    get:
+      description: Только опубликованные. Фильтрация на бэкенде. Доступно всем; с
+        токеном заполняются like и is_mine.
+      parameters:
+      - description: Сумма от, ₽/мес
+        in: query
+        name: min_amount
+        type: number
+      - description: Сумма до, ₽/мес
+        in: query
+        name: max_amount
+        type: number
+      - description: 1 — постоянные, 0 — переменные
+        enum:
+        - 0
+        - 1
+        in: query
+        name: is_fixed
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/api.BreakEvenTypeJSON'
+            type: array
+      summary: Список видов затрат с фильтром
+      tags:
+      - breakeven_point
+    post:
+      consumes:
+      - multipart/form-data
+      description: Файлы сохраняются в MinIO под латинскими именами; создатель — пользователь
+        из JWT. Доступно создателю.
+      parameters:
+      - description: Название
+        in: formData
+        name: name
+        required: true
+        type: string
+      - description: Фото
+        in: formData
+        name: image
+        type: file
+      - description: Видео
+        in: formData
+        name: video
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.BreakEvenTypeJSON'
+        "400":
+          description: нет названия
+        "401":
+          description: нет токена
+        "409":
+          description: черновик уже есть
+      security:
+      - BearerAuth: []
+      summary: Создать вид затрат (черновик) с фото и видео
+      tags:
+      - breakeven_point
+  /api/breakeven_point/{id}:
+    delete:
+      parameters:
+      - description: id вида затрат
+        in: path
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: статус deleted
+        "401":
+          description: нет токена
+        "403":
+          description: чужая карточка
+        "404":
+          description: не найдена
+      security:
+      - BearerAuth: []
+      summary: Удалить свой вид затрат (soft delete)
+      tags:
+      - breakeven_point
+  /api/breakeven_point/{id}/like:
+    post:
+      consumes:
+      - application/json
+      description: like = 1 ставит лайк текущего пользователя, like = 0 отменяет.
+        Доступно создателю.
+      parameters:
+      - description: id вида затрат
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 0 или 1
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.LikeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LikeResponse'
+        "400":
+          description: like не 0 и не 1
+        "401":
+          description: нет токена
+        "404":
+          description: не найдена
+      security:
+      - BearerAuth: []
+      summary: Поставить или отменить лайк
+      tags:
+      - breakeven_point
+  /api/breakeven_point/{id}/publish:
+    put:
+      consumes:
+      - application/json
+      description: 'draft → published: краткое описание и 2 поля по теме, formed_at.
+        Вернуть в черновик нельзя. Доступно создателю.'
+      parameters:
+      - description: id черновика
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Краткое описание и 2 поля по теме
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.PublishRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.BreakEvenTypeJSON'
+        "400":
+          description: неверное тело запроса
+        "401":
+          description: нет токена
+        "403":
+          description: чужая карточка или не черновик
+        "404":
+          description: не найдена
+      security:
+      - BearerAuth: []
+      summary: Опубликовать свой черновик
+      tags:
+      - breakeven_point
+  /api/breakeven_point/draft:
+    get:
+      description: Не более одного черновика у пользователя, id не передаётся. Доступно
+        создателю.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.BreakEvenTypeJSON'
+        "401":
+          description: нет токена
+        "404":
+          description: черновика нет
+      security:
+      - BearerAuth: []
+      summary: Черновик текущего пользователя
+      tags:
+      - breakeven_point
+  /api/breakeven_point/feed:
+    get:
+      description: Без id — первый опубликованный; с id — по id; с id и next=true
+        — следующий после id. Доступно всем.
+      parameters:
+      - description: id вида затрат
+        in: query
+        name: id
+        type: integer
+      - description: true — следующий после id
+        in: query
+        name: next
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.BreakEvenTypeJSON'
+        "404":
+          description: не найден или удалён
+      summary: 'Лента: один вид затрат'
+      tags:
+      - breakeven_point
+  /api/users/login:
+    post:
+      consumes:
+      - application/json
+      description: Проверяет логин и пароль (bcrypt) и выдаёт JWT. Доступно всем.
+      parameters:
+      - description: Логин и пароль
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.LoginResponse'
+        "400":
+          description: неверный формат запроса
+        "401":
+          description: неверный логин или пароль
+      summary: Аутентификация пользователя
+      tags:
+      - users
+  /api/users/logout:
+    post:
+      description: Кладёт текущий JWT в blacklist Redis до окончания срока его действия.
+        Доступно создателю.
+      responses:
+        "200":
+          description: токен отозван
+        "401":
+          description: нет токена или токен недействителен
+      security:
+      - BearerAuth: []
+      summary: Деавторизация пользователя
+      tags:
+      - users
+  /api/users/register:
+    post:
+      consumes:
+      - application/json
+      description: Пароль хранится bcrypt-хэшем. Доступно всем.
+      parameters:
+      - description: Логин и пароль
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/api.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/api.UserJSON'
+        "400":
+          description: неверное тело запроса
+        "409":
+          description: логин занят
+      summary: Регистрация пользователя
+      tags:
+      - users
+securityDefinitions:
+  BearerAuth:
+    description: 'Введите: Bearer <access_token из POST /api/users/login>'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

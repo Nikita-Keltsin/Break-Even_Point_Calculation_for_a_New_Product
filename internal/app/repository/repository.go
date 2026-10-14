@@ -236,6 +236,14 @@ func (r *Repository) UsernameExists(name string) bool {
 
 func (r *Repository) CreateUser(u *User) error { return r.DB.Create(u).Error }
 
+// ===== ЛР-4: аутентификация =====
+
+// GetUserByUsername — пользователь по логину (для проверки пароля при входе)
+func (r *Repository) GetUserByUsername(name string) (User, error) {
+	var u User
+	return u, r.DB.Where("username = ?", name).First(&u).Error
+}
+
 func formatMoney(n int) string {
 	s := strconv.Itoa(n)
 	var sb strings.Builder
