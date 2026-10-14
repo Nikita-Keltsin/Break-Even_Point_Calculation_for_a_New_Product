@@ -10,6 +10,15 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// ЛР-2 (SSR): 6 HTTP-методов
+//   GET  /breakeven-point/cost-types  — плитка услуг + поиск (ORM)
+//   GET  /breakeven-point/feed[/:id]  — лента, одна строка из БД (ORM)
+//   GET  /breakeven-point/addition    — добавление (ORM)
+//   POST /breakeven-point/draft       — «Далее»: создать черновик (ORM)
+//   POST /breakeven-point/publish     — «Опубликовать» (ORM)
+//   POST /breakeven-point/delete      — логическое удаление (SQL UPDATE, без ORM)
+// Лайки во 2-й лабораторной только отображаются из БД.
+
 func CurrentUserID() int { return 1 }
 
 type Handler struct {
@@ -19,99 +28,12 @@ type Handler struct {
 func NewHandler(r *repository.Repository) *Handler { return &Handler{Repository: r} }
 
 type CostCard struct {
-	Cost       repository.CostType
+	Cost       repository.BreakEvenType
 	ImageURL   string
 	LikesCount int64
 }
 
-// ЛЕНТА: id берём из :id или ?id=, full — из ?full=1
-func (h *Handler) FeedHandler(ctx *gin.Context) {
-	idStr := ctx.Param("id")
-	if idStr == "" {
-		idStr = ctx.Query("id")
-	}
-	id, _ := strconv.Atoi(idStr)
-	cost, err := h.Repository.GetFeedCost(id)
-	if err != nil {
-		ctx.String(http.StatusNotFound, "Услуга не найдена или была удалена")
-		return
-	}
-	ctx.HTML(http.StatusOK, "feed.html", gin.H{
-		"Cost":     cost,
-		"VideoURL": h.Repository.VideoURL(cost),
-		"Likes":    h.Repository.GetLikesCount(cost.ID),
-		"Liked":    h.Repository.HasLiked(CurrentUserID(), cost.ID),
-		"NextID":   h.Repository.GetNextPublishedID(id),
-		"Full":     ctx.Query("full") == "1",
-		"Page":     "feed",
-	})
-}
-
-// ЛАЙК: редирект обратно в том же стиле маршрута
-func (h *Handler) LikeHandler(ctx *gin.Context) {
-	costID, _ := strconv.Atoi(ctx.PostForm("cost_id"))
-	if err := h.Repository.ToggleLike(CurrentUserID(), costID); err != nil {
-		log.Println(err)
-	}
-	loc := "/breakeven-point/feed/" + ctx.PostForm("cost_id")
-	if ctx.PostForm("full") == "1" {
-		loc += "?full=1"
-	}
-	ctx.Redirect(http.StatusFound, loc)
-}
-
-// ДОБАВЛЕНИЕ: превью из resources/media (SSR), НЕ из MinIO
-func (h *Handler) AdditionHandler(ctx *gin.Context) {
-	draft, err := h.Repository.GetDraftByUser(CurrentUserID())
-	ctx.HTML(http.StatusOK, "addition.html", gin.H{
-		"HasDraft": err == nil,
-		"Draft":    draft,
-		"Page":     "addition",
-	})
-}
-
-func (h *Handler) CreateDraftHandler(ctx *gin.Context) {
-	name := ctx.PostForm("cost_name")
-	if name == "" {
-		ctx.String(http.StatusBadRequest, "Название обязательно")
-		return
-	}
-	if _, err := h.Repository.GetDraftByUser(CurrentUserID()); err == nil {
-		ctx.Redirect(http.StatusFound, "/breakeven-point/addition")
-		return
-	}
-	kind := ctx.PostForm("cost_kind")
-	var amt *float64
-	if s := ctx.PostForm("amount_monthly"); s != "" {
-		v, _ := strconv.ParseFloat(s, 64)
-		amt = &v
-	}
-	err := h.Repository.CreateDraft(CurrentUserID(), repository.CostType{
-		CostName:         name,
-		ShortDescription: ctx.PostForm("description"),
-		FullDescription:  ctx.PostForm("full_description"),
-		CostKind:         &kind,
-		AmountMonthly:    amt,
-	})
-	if err != nil {
-		log.Println(err)
-	}
-	ctx.Redirect(http.StatusFound, "/breakeven-point/addition")
-}
-
-func (h *Handler) PublishHandler(ctx *gin.Context) {
-	amount, _ := strconv.ParseFloat(ctx.PostForm("amount_monthly"), 64)
-	err := h.Repository.PublishDraft(CurrentUserID(),
-		ctx.PostForm("description"),
-		ctx.PostForm("full_description"),
-		amount,
-		ctx.PostForm("cost_kind"))
-	if err != nil {
-		log.Println(err)
-	}
-	ctx.Redirect(http.StatusFound, "/breakeven-point/cost-types")
-}
-
+// GET /breakeven-point/cost-types — плитка + фильтр по сумме и виду затрат
 func (h *Handler) CostTypesHandler(ctx *gin.Context) {
 	fromStr := ctx.Query("amount_from")
 	toStr := ctx.Query("amount_to")
@@ -128,11 +50,18 @@ func (h *Handler) CostTypesHandler(ctx *gin.Context) {
 	}
 	if toStr == "" {
 		toStr = "8000000"
+		to = 8000000
 	}
 	fixedOn := ctx.Query("type_fixed") == "on"
 	varOn := ctx.Query("type_variable") == "on"
+	kind := ""
+	if fixedOn && !varOn {
+		kind = "fixed"
+	} else if varOn && !fixedOn {
+		kind = "variable"
+	}
 
-	costs, err := h.Repository.GetPublishedCosts(from, to, hasFrom, hasTo, fixedOn, varOn)
+	costs, err := h.Repository.GetPublishedCosts(from, to, hasFrom, hasTo, kind)
 	if err != nil {
 		log.Println(err)
 	}
@@ -148,14 +77,93 @@ func (h *Handler) CostTypesHandler(ctx *gin.Context) {
 		"Costs":    cards,
 		"From":     fromStr,
 		"To":       toStr,
-		"FromText": repository.CostType{AmountMonthly: &from}.AmountText(),
-		"ToText":   repository.CostType{AmountMonthly: &to}.AmountText(),
+		"FromText": repository.BreakEvenType{AmountMonthly: &from}.AmountText(),
+		"ToText":   repository.BreakEvenType{AmountMonthly: &to}.AmountText(),
 		"FixedOn":  fixedOn,
 		"VarOn":    varOn,
 		"Page":     "costs",
 	})
 }
 
+// GET /breakeven-point/feed и /breakeven-point/feed/:id
+func (h *Handler) FeedHandler(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	if idStr == "" {
+		idStr = ctx.Query("id")
+	}
+	id, _ := strconv.Atoi(idStr)
+	cost, err := h.Repository.GetFeedCost(id) // одна строка из БД
+	if err != nil {
+		ctx.String(http.StatusNotFound, "Услуга не найдена или была удалена")
+		return
+	}
+	next, err := h.Repository.GetNextFeedCost(cost.ID)
+	nextID := cost.ID
+	if err == nil {
+		nextID = next.ID
+	}
+	ctx.HTML(http.StatusOK, "feed.html", gin.H{
+		"Cost":     cost,
+		"VideoURL": h.Repository.VideoURL(cost),
+		"Likes":    h.Repository.GetLikesCount(cost.ID),
+		"Liked":    h.Repository.HasLiked(CurrentUserID(), cost.ID),
+		"NextID":   nextID,
+		"Page":     "feed",
+	})
+}
+
+// GET /breakeven-point/addition
+// Нет черновика → название, фото, видео и кнопка «Далее».
+// Есть черновик → поля заполнены + краткое описание, 2 поля по теме и кнопка «Опубликовать».
+func (h *Handler) AdditionHandler(ctx *gin.Context) {
+	draft, err := h.Repository.GetDraftByUser(CurrentUserID())
+	data := gin.H{
+		"HasDraft": err == nil,
+		"Page":     "addition",
+		"ImageURL": repository.DefaultImageURL,
+		"VideoURL": repository.DefaultVideoURL,
+	}
+	if err == nil {
+		data["Draft"] = draft
+		data["ImageURL"] = h.Repository.ImageURL(*draft)
+		data["VideoURL"] = h.Repository.VideoURL(*draft)
+	}
+	ctx.HTML(http.StatusOK, "addition.html", data)
+}
+
+// POST /breakeven-point/draft — «Далее»: черновик создаётся только здесь (ORM)
+func (h *Handler) CreateDraftHandler(ctx *gin.Context) {
+	name := ctx.PostForm("cost_name")
+	if name == "" {
+		ctx.String(http.StatusBadRequest, "Название обязательно")
+		return
+	}
+	if _, err := h.Repository.GetDraftByUser(CurrentUserID()); err == nil {
+		ctx.Redirect(http.StatusFound, "/breakeven-point/addition")
+		return
+	}
+	if err := h.Repository.CreateDraft(CurrentUserID(), name); err != nil {
+		log.Println(err)
+	}
+	ctx.Redirect(http.StatusFound, "/breakeven-point/addition")
+}
+
+// POST /breakeven-point/publish — «Опубликовать» (ORM)
+func (h *Handler) PublishHandler(ctx *gin.Context) {
+	description := ctx.PostForm("short_description")
+	amount, err := strconv.ParseFloat(ctx.PostForm("amount_monthly"), 64)
+	if description == "" || err != nil {
+		ctx.String(http.StatusBadRequest, "Заполните краткое описание и сумму затрат")
+		return
+	}
+	isFixed := ctx.PostForm("is_fixed") == "on" // галочка
+	if err := h.Repository.PublishDraft(CurrentUserID(), description, amount, isFixed); err != nil {
+		log.Println(err)
+	}
+	ctx.Redirect(http.StatusFound, "/breakeven-point/cost-types")
+}
+
+// POST /breakeven-point/delete — логическое удаление через SQL UPDATE (без ORM)
 func (h *Handler) DeleteHandler(ctx *gin.Context) {
 	id, _ := strconv.Atoi(ctx.PostForm("id"))
 	if err := h.Repository.DeleteCostSQL(id); err != nil {

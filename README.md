@@ -1,74 +1,49 @@
-# Лабораторная 2 — База данных PostgreSQL и подключение к бэкенду
-## Тема: «Расчёт точки безубыточности для нового продукта» (виды затрат)
+# Лабораторная работа №2 — база данных PostgreSQL (breakeven_point)
+**Автор:** Кельцин Никита Максимович, ИУ5-51Б
 
-Стек: Go + Gin + GORM, PostgreSQL (docker, host-порт 5433), Adminer (:8081), MinIO (:9000, медиа лабы 1), дефолтные медиа — на SSR-сервере в `resources/media`.
+**Тема:** расчёт точки безубыточности нового продукта. Услуга — **вид затрат** (постоянные: аренда, оклады; переменные: сырьё, сдельная зарплата).
 
-## Страницы (3 шаблона, SSR)
-- **Лента** (`feed.html`) — одна опубликованная услуга: БД возвращает сразу одну строку (First = LIMIT 1), без фильтрации в коде. «Еще» (?full=1) раскрывает полное описание, «Свернуть» сворачивает; лайк-сердце (красное, если текущий пользователь лайкнул, счёт из таблицы likes); «ДАЛЕЕ» — следующая опубликованная, в конце заворот на первую. Удалённые услуги не просматриваются (404).
-- **Добавление** (`addition.html`) — фото и видео сверху, друг под другом, превью из директории media SSR-сервера, выбор из проводника (файлы НЕ отправляются на сервер и НЕ сохраняются в БД). Если у пользователя нет черновика — форма и кнопка «Далее»; если черновик есть — страница открывается с заполненными полями и кнопкой «Опубликовать».
-- **Виды затрат / плитка** (`cost_types.html`) — только опубликованные; фильтрация на бэкенде: двойной ползунок диапазона суммы (amount_from/amount_to) и чекбоксы «Постоянные/Переменные»; карточки с фото (при пустом url или недоступном файле — заглушка с SSR через onerror), счётчиком лайков из БД и кнопкой «Удалить».
+**Цель работы:** разработка структуры базы данных и её подключение к бэкенду.
 
-## HTTP-методы (все /breakeven-point/...)
-- GET /breakeven-point/cost-types — плитка со списком опубликованных услуг и фильтрацией на бэкенде.
-- GET /breakeven-point/feed и /breakeven-point/feed?id=N — лента (одна строка из БД), ?full=1 — полное описание.
-- GET /breakeven-point/addition — страница добавления (черновик или пустая форма).
-- POST /breakeven-point/draft — создание черновика через ORM (DB.Create); статус, создатель и даты ставит бэкенд; не более одного черновика у пользователя (частичный уникальный индекс).
-- POST /breakeven-point/publish — публикация через ORM (DB.Updates): краткая/полная информация, amount_monthly, cost_kind, status='published', formed_at=NOW(); вернуть в черновик нельзя.
-- POST /breakeven-point/delete — логическое удаление услуги: SQL UPDATE status='deleted' через database/sql, БЕЗ ORM.
-- POST /breakeven-point/like — лайк текущего пользователя: INSERT/DELETE в таблицу likes (м-м); UNIQUE(user_id, cost_id) — один лайк на пару.
+**Порядок показа:** **Скриншоты 1–2** — показать панель администратора Adminer, в которой логически удалить через статус услугу, посмотреть данные через select в БД. **Скриншоты 3–10** — показать 3 страницы приложения: выполнить поиск, удалить услугу, перейти по url удалённой услуги, добавить услугу, показать select в БД, опубликовать карточку, снова показать select в БД. **Скриншоты 11–13** — в БД изменить поля по теме в услуге и количество строк в м-м и показать их в приложении. **Скриншоты 14–21** — в коде показать модели, 5 контроллеров через ORM, а удаление услуги через SQL UPDATE. **Скриншот 22** — фото и видео по умолчанию в HTML.
 
-## Соглашения
-- Дефолтные фото и видео лежат на SSR-сервере (`/static/media/default-image.jpg`, `/static/media/default-video.mp4`), НЕ в MinIO; подставляются сервером при пустых url и через onerror в HTML при недоступном файле.
-- Статус услуги (draft/published/deleted) хранится только в БД; удалённые услуги не передаются на клиент и не просматриваются.
-- Системные поля (id, статус, создатель, даты создания/формирования) вычисляются на бэкенде, с клиента не передаются.
-- Пользователь-создатель зафиксирован константой через функцию-singleton CurrentUserID() = 1.
-- Каскадное удаление запрещено: все FK без ON DELETE CASCADE.
+**Контрольные вопросы:** виды БД, SQL-запросы, курсоры, ORM, модель и миграции, чистая архитектура.
 
-## Таблицы базы данных
+**ER-диаграмма:** сделана в StarUML (проект `breakeven_point.mdj`): таблицы, связи, столбцы, типы столбцов и их длина, первичные и внешние ключи.
 
-### users — пользователи
-| поле | тип | описание |
-|---|---|---|
-| id | SERIAL, PK | первичный ключ |
-| username | VARCHAR(50), UNIQUE, NOT NULL | имя пользователя |
-| email | VARCHAR(100) | почта |
-| role | VARCHAR(20), NOT NULL, DEFAULT 'creator' | роль |
+**Задание:** создание базы данных PostgreSQL по теме работы, подключение БД к созданным трём шаблонам.
 
-### cost_types — черновики, опубликованные и удалённые услуги
-| поле | тип | описание |
-|---|---|---|
-| id | SERIAL, PK | первичный ключ |
-| cost_name | VARCHAR(100), NOT NULL | наименование услуги |
-| short_description | VARCHAR(255), NULL | краткое описание |
-| full_description | TEXT, NULL | полное описание |
-| status | VARCHAR(20), NOT NULL, DEFAULT 'draft' | draft/published/deleted, CHECK-ограничение |
-| image_url | VARCHAR(255), NULL | url/имя изображения (пусто → дефолт с SSR) |
-| video_url | VARCHAR(255), NULL | url/имя видео (пусто → дефолт с SSR) |
-| amount_monthly | NUMERIC(12,2), NULL | поле по теме 1: норматив, ₽/мес |
-| cost_kind | VARCHAR(20), NULL | поле по теме 2: fixed/variable |
-| created_at | TIMESTAMP, NOT NULL, DEFAULT NOW() | дата создания |
-| creator_id | INTEGER, NOT NULL, FK → users.id | создатель (без каскада) |
-| formed_at | TIMESTAMP, NULL | дата формирования/публикации |
+## Запуск
 
-Индекс: CREATE UNIQUE INDEX idx_one_draft_per_user ON cost_types(creator_id) WHERE status='draft' — не более одного черновика у пользователя.
+```bash
+docker compose up -d   # postgres :5433, adminer :8081, minio :9000/9001
+# Adminer → http://localhost:8081 (PostgreSQL, сервер postgres, логин/пароль postgres, БД breakeven_db)
+#   → «SQL-запрос» → выполнить migrations/001_schema.sql, затем migrations/002_seed.sql
+go run ./cmd/Break-Even_Point_Calculation_for_a_New_Product   # http://localhost:8080/breakeven-point/cost-types
+```
 
-### likes — связь многие-ко-многим пользователь→услуга
-| поле | тип | описание |
-|---|---|---|
-| id | SERIAL, PK | первичный ключ |
-| user_id | INTEGER, NOT NULL, FK → users.id | кто лайкнул (без каскада) |
-| cost_id | INTEGER, NOT NULL, FK → cost_types.id | что лайкнули (без каскада) |
-| — | UNIQUE(user_id, cost_id) | один лайк на пару |
+## HTTP-методы (ровно 6)
 
-## Миграции и наполнение
-- `migrations/001_schema.sql` — CREATE TABLE users / cost_types / likes, CHECK статусов, уникальный индекс черновика.
-- `migrations/002_seed.sql` — INSERT: 3 опубликованные услуги, 1 удалённая, 1 черновик; лайки.
-- `migrations/003_api.sql` — ALTER TABLE users ADD password_hash (для ЛР3).
-- Наполнение и правки также через Adminer (:8081, сервер `postgres`).
+| № | Метод | URL | Что делает | Доступ к БД |
+|---|---|---|---|---|
+| 1 | GET | `/breakeven-point/cost-types` | плитка видов затрат + поиск: сумма от/до, галочки «Постоянные / Переменные» | ORM, фильтр в SQL WHERE |
+| 2 | GET | `/breakeven-point/feed`, `/breakeven-point/feed/:id` | лента: из БД возвращается ровно одна строка | ORM (`First`) |
+| 3 | GET | `/breakeven-point/addition` | добавление: шаг 1 (название, фото, видео, «Далее») или шаг 2 (черновик, «Опубликовать») | ORM |
+| 4 | POST | `/breakeven-point/draft` | «Далее» — создать черновик | ORM |
+| 5 | POST | `/breakeven-point/publish` | «Опубликовать» — одно краткое описание + 2 поля по теме, статус → published | ORM |
+| 6 | POST | `/breakeven-point/delete` | логическое удаление с плитки, статус → deleted | SQL `UPDATE` (без ORM) |
 
-## Порядок показа (Adminer + приложение)
-1. UPDATE cost_types SET status='deleted' WHERE id=3; + SELECT * FROM cost_types; — логическое удаление через статус.
-2. Плитка: поиск/фильтр двойным ползунком; «Удалить» на карточке; переход по url удалённой → «не найдена».
-3. Добавление: «Далее» → SELECT (draft) → заполнить → «Опубликовать» → SELECT (published).
-4. UPDATE cost_types SET amount_monthly=3000000, cost_kind='fixed' WHERE id=2; и INSERT INTO likes (user_id, cost_id) VALUES (2,2),(3,2); → показать изменённые поля и счёт лайков в ленте/плитке.
-5. В коде: модели (GORM-теги), 5 контроллеров через ORM, удаление услуги через SQL UPDATE (sqlDB.Exec).
+- Черновик создаётся только кнопкой «Далее»; если черновик уже есть, страница добавления открывается с заполненными полями и кнопкой «Опубликовать».
+- Описание вводится только при публикации, и оно одно (`short_description`). Поля по теме: `amount_monthly` (сумма затрат в месяц) и `is_fixed` (галочка «Постоянные затраты»).
+- Новые фото и видео в ЛР-2 на сервер не передаются. Если url пустой или файл недоступен, показываются фото и видео по умолчанию из `resources/media` (SSR-сервер).
+- Удалённые услуги просматривать нельзя. Лайки только отображаются из БД.
+
+## Таблицы БД
+
+**users** — пользователи: `id` SERIAL PK · `username` VARCHAR(50) NOT NULL UNIQUE · `password_hash` VARCHAR(100) NOT NULL · `email` VARCHAR(100) · `role` VARCHAR(20) NOT NULL
+
+**breakeven_types** — услуги (виды затрат): `id` SERIAL PK · `cost_name` VARCHAR(100) NOT NULL · `short_description` VARCHAR(255) · `status` VARCHAR(20) NOT NULL (draft / published / deleted) · `image_url` VARCHAR(255) NOT NULL · `video_url` VARCHAR(255) NOT NULL · `amount_monthly` NUMERIC(12,2) · `is_fixed` BOOLEAN NOT NULL · `created_at` TIMESTAMP NOT NULL · `creator_id` INT NOT NULL FK → users.id · `formed_at` TIMESTAMP
+
+**likes** — лайки, м-м пользователь — услуга: `id` SERIAL PK · `user_id` INT FK → users.id · `cost_id` INT FK → breakeven_types.id · UNIQUE(user_id, cost_id)
+
+Каскадное удаление запрещено (все FK — ON DELETE RESTRICT). В тестовых данных есть услуги во всех трёх статусах. У пользователя не более одного черновика (частичный уникальный индекс).

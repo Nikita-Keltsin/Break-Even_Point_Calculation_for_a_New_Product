@@ -12,7 +12,8 @@ import (
 )
 
 func StartServer() {
-	log.Println("Starting server")
+	log.Println("Starting server breakeven_point")
+
 	dsn := "host=localhost port=5433 user=postgres password=postgres dbname=breakeven_db sslmode=disable"
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
@@ -28,15 +29,15 @@ func StartServer() {
 	r.LoadHTMLGlob("templates/*")
 	r.Static("/static", "./resources")
 
-	r.GET("/breakeven-point/feed", h.FeedHandler)
-	r.GET("/breakeven-point/feed/:id", h.FeedHandler)
-	r.GET("/breakeven-point/addition", h.AdditionHandler)
-	r.GET("/breakeven-point/cost-types", h.CostTypesHandler)
-	r.POST("/breakeven-point/draft", h.CreateDraftHandler)
-	r.POST("/breakeven-point/publish", h.PublishHandler)
-	r.POST("/breakeven-point/delete", h.DeleteHandler)
-	r.POST("/breakeven-point/like", h.LikeHandler)
+	// ЛР-2: ровно 6 HTTP-методов — 3 GET, 2 POST через ORM, 1 POST удаления через SQL UPDATE
+	r.GET("/breakeven-point/cost-types", h.CostTypesHandler) // плитка + поиск (ORM)
+	r.GET("/breakeven-point/feed", h.FeedHandler)            // лента: одна строка из БД (ORM)
+	r.GET("/breakeven-point/feed/:id", h.FeedHandler)        //   тот же GET-метод ленты, по id
+	r.GET("/breakeven-point/addition", h.AdditionHandler)    // добавление: шаг 1 / шаг 2 (ORM)
+	r.POST("/breakeven-point/draft", h.CreateDraftHandler)   // «Далее» — черновик (ORM)
+	r.POST("/breakeven-point/publish", h.PublishHandler)     // «Опубликовать» — смена статуса (ORM)
+	r.POST("/breakeven-point/delete", h.DeleteHandler)       // логическое удаление (SQL UPDATE, без ORM)
 
-	r.Run()
+	r.Run() // :8080
 	log.Println("Server down")
 }
