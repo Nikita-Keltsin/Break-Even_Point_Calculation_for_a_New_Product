@@ -24,28 +24,21 @@
 
     <div class="feed-overlay">
         <h1 class="feed-title">{{ .Cost.CostName }}</h1>
-        {{ if .Full }}
-        <p class="feed-desc feed-desc-full">{{ .Cost.FullDescription }}</p>
-        <a class="more-link" href="/breakeven-point/feed/{{ .Cost.ID }}">Свернуть</a>
-        {{ else }}
-        <p class="feed-desc">{{ .Cost.ShortDescription }}</p>
-        <a class="more-link" href="/breakeven-point/feed/{{ .Cost.ID }}?full=1">Еще</a>
-        {{ end }}
+        <p class="feed-desc">{{ .Cost.Description }}</p>
         <div class="feed-chips">
             <div class="feed-chip"><span>СУММА</span><b>{{ .Cost.AmountText }}</b></div>
-            <div class="feed-chip"><span>ВИД ЗАТРАТ</span><b>{{ .Cost.KindLabel }}</b></div>
+            <div class="feed-chip"><span>ВИД ЗАТРАТ</span><b>{{ if .Cost.Fixed }}☑{{ else }}☐{{ end }} {{ .Cost.KindLabel }}</b></div>
         </div>
     </div>
 
     <div class="feed-actions">
-        <form class="round-wrap" action="/breakeven-point/like" method="POST">
-            <input type="hidden" name="cost_id" value="{{ .Cost.ID }}">
-            <input type="hidden" name="full" value="{{ if .Full }}1{{ else }}0{{ end }}">
-            <button type="submit" class="round-btn {{ if .Liked }}liked{{ end }}">
+        <!-- ЛР-2: лайки только отображаются из БД (ставятся через API в ЛР-3) -->
+        <div class="round-wrap">
+            <span class="round-btn {{ if .Liked }}liked{{ end }}">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 20s-7-4.5-9-9c-1.2-2.8.6-6 3.8-6 2 0 3.4 1.2 5.2 3.4C13.8 6.2 15.2 5 17.2 5c3.2 0 5 3.2 3.8 6-2 4.5-9 9-9 9z"/></svg>
-            </button>
+            </span>
             <span class="round-label">{{ .Likes }}</span>
-        </form>
+        </div>
         <div class="round-wrap">
             <span class="round-btn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="6" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="M8.2 10.8l6.6-3.6M8.2 13.2l6.6 3.6"/></svg>

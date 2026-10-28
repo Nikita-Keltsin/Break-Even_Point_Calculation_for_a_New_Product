@@ -52,9 +52,9 @@ func (a *API) fullURL(key string) string {
 	return "http://" + minioEndpoint + "/" + BucketName + "/" + key
 }
 
-func (a *API) toCostJSON(c repository.BreakEvenType) BreakEvenTypeJSON {
-	uid := CurrentUserID()
-	return BreakEvenTypeJSON{
+// toCostJSON — общие поля вида затрат (черновик, добавление, публикация)
+func (a *API) toCostJSON(c repository.BreakEvenPoint) BreakEvenPointJSON {
+	return BreakEvenPointJSON{
 		ID:               c.ID,
 		CostName:         c.CostName,
 		ShortDescription: c.ShortDescription,
@@ -66,9 +66,17 @@ func (a *API) toCostJSON(c repository.BreakEvenType) BreakEvenTypeJSON {
 		CreatedAt:        c.CreatedAt,
 		FormedAt:         c.FormedAt,
 		LikesCount:       a.Repo.GetLikesCount(c.ID),
-		Like:             boolTo01(a.Repo.HasLiked(uid, c.ID)),
-		IsMine:           boolTo01(c.CreatorID == uid),
 	}
+}
+
+// toListJSON — карточка списка: + is_mine (своя ли карточка), uid = 0 — гость
+func (a *API) toListJSON(c repository.BreakEvenPoint, uid int) BreakEvenPointListJSON {
+	return BreakEvenPointListJSON{BreakEvenPointJSON: a.toCostJSON(c), IsMine: boolTo01(uid != 0 && c.CreatorID == uid)}
+}
+
+// toFeedJSON — карточка ленты: + is_liked (стоит ли лайк текущего пользователя), uid = 0 — гость
+func (a *API) toFeedJSON(c repository.BreakEvenPoint, uid int) BreakEvenPointFeedJSON {
+	return BreakEvenPointFeedJSON{BreakEvenPointJSON: a.toCostJSON(c), IsLiked: boolTo01(uid != 0 && a.Repo.HasLiked(uid, c.ID))}
 }
 
 // ===================== ДОМЕН «УСЛУГА» (/api/breakeven_point) =====================
@@ -91,9 +99,9 @@ func (a *API) ListCosts(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	res := make([]BreakEvenTypeJSON, 0, len(costs))
+	res := make([]BreakEvenPointListJSON, 0, len(costs))
 	for _, c := range costs {
-		res = append(res, a.toCostJSON(c))
+		res = append(res, a.toListJSON(c, CurrentUserID()))
 	}
 	ctx.JSON(http.StatusOK, res)
 }
@@ -102,7 +110,7 @@ func (a *API) ListCosts(ctx *gin.Context) {
 //     GET /api/breakeven_point/feed/:id        — опубликованная по id
 //     GET /api/breakeven_point/feed/:id?next=1 — следующая после id (next=true тоже принимается)
 //
-// Из БД всегда читается одна строка; в ответе like=0/1 для текущего пользователя.
+// Из БД всегда читается одна строка; в ответе is_liked = 0/1 — лайк текущего пользователя.
 func (a *API) FeedCost(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	if idStr == "" {
@@ -110,7 +118,7 @@ func (a *API) FeedCost(ctx *gin.Context) {
 	}
 	id, _ := strconv.Atoi(idStr)
 	var (
-		c   repository.BreakEvenType
+		c   repository.BreakEvenPoint
 		err error
 	)
 	if next := ctx.Query("next"); id > 0 && (next == "1" || next == "true") {
@@ -122,7 +130,7 @@ func (a *API) FeedCost(ctx *gin.Context) {
 		ctx.Status(http.StatusNotFound)
 		return
 	}
-	ctx.JSON(http.StatusOK, a.toCostJSON(c))
+	ctx.JSON(http.StatusOK, a.toFeedJSON(c, CurrentUserID()))
 }
 
 // 3. GET /api/breakeven_point/draft — черновик текущего пользователя (не более одного), id не передаётся
@@ -237,7 +245,7 @@ func (a *API) LikeCost(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	ctx.JSON(http.StatusOK, gin.H{"like": *body.Like, "likes_count": a.Repo.GetLikesCount(id)})
+	ctx.JSON(http.StatusOK, LikeResponse{IsLiked: *body.Like, LikesCount: a.Repo.GetLikesCount(id)})
 }
 
 // ===================== ДОМЕН «ПОЛЬЗОВАТЕЛЬ» (/api/users) =====================

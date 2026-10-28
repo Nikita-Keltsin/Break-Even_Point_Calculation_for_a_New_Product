@@ -28,7 +28,7 @@ type Handler struct {
 func NewHandler(r *repository.Repository) *Handler { return &Handler{Repository: r} }
 
 type CostCard struct {
-	Cost       repository.BreakEvenType
+	Cost       repository.BreakEvenPoint
 	ImageURL   string
 	LikesCount int64
 }
@@ -77,8 +77,8 @@ func (h *Handler) CostTypesHandler(ctx *gin.Context) {
 		"Costs":    cards,
 		"From":     fromStr,
 		"To":       toStr,
-		"FromText": repository.BreakEvenType{AmountMonthly: &from}.AmountText(),
-		"ToText":   repository.BreakEvenType{AmountMonthly: &to}.AmountText(),
+		"FromText": repository.BreakEvenPoint{AmountMonthly: &from}.AmountText(),
+		"ToText":   repository.BreakEvenPoint{AmountMonthly: &to}.AmountText(),
 		"FixedOn":  fixedOn,
 		"VarOn":    varOn,
 		"Page":     "costs",

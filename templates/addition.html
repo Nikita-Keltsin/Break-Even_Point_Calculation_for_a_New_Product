@@ -8,6 +8,7 @@
         .media-zone { cursor: pointer; }
         .media-preview { width: 100%; border-radius: 10px; overflow: hidden; background: #FFFFFF; }
         .media-preview img, .media-preview video { width: 100%; height: 170px; object-fit: cover; display: block; }
+        .media-zone.static { cursor: default; }
     </style>
 </head>
 <body>
@@ -23,6 +24,8 @@
 
     <h1 class="page-title">Добавление</h1>
 
+    {{ if not .HasDraft }}
+    <!-- ШАГ 1: название, фото, видео → «Далее». Фото/видео в ЛР-2 на сервер не передаются -->
     <div class="card">
         <b class="card-title">Фото и видео</b>
         <div class="media-stack">
@@ -31,7 +34,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="7" width="13" height="12" rx="2"/><path d="M7 7l1.5-2h5L15 7"/><circle cx="9.5" cy="13" r="3"/><path d="M19 5v6M16 8h6"/></svg>
                 </span>
                 <span class="media-label">Загрузить фото</span>
-                <span class="media-preview"><img id="imgPreview" src="/static/media/default-image.png" alt=""></span>
+                <span class="media-preview"><img id="imgPreview" src="{{ .ImageURL }}" alt=""></span>
             </div>
             <input type="file" id="imageInput" accept="image/*" style="display:none"
                    onchange="if(this.files&&this.files[0]){document.getElementById('imgPreview').src=URL.createObjectURL(this.files[0]);}">
@@ -41,49 +44,61 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="6" width="12" height="12" rx="2"/><path d="M15 10l6-3v10l-6-3z"/></svg>
                 </span>
                 <span class="media-label">Загрузить видео</span>
-                <span class="media-preview"><video id="videoPreview" src="/static/media/default-video.mp4" muted loop playsinline autoplay></video></span>
+                <span class="media-preview"><video id="videoPreview" src="{{ .VideoURL }}" muted loop playsinline autoplay></video></span>
             </div>
             <input type="file" id="videoInput" accept="video/*" style="display:none"
                    onchange="if(this.files&&this.files[0]){document.getElementById('videoPreview').src=URL.createObjectURL(this.files[0]);}">
         </div>
     </div>
 
-    <form action="{{ if .HasDraft }}/breakeven-point/publish{{ else }}/breakeven-point/draft{{ end }}" method="POST">
+    <form action="/breakeven-point/draft" method="POST">
         <div class="card">
             <b class="card-title">Новый вид затрат</b>
-
-            <label class="field-label">Продукт / услуга / статья затрат</label>
-            <input class="field" type="text" name="cost_name" required
-                   placeholder="Например: Аренда помещения"
-                   value="{{ if .HasDraft }}{{ .Draft.CostName }}{{ end }}">
-
-            <label class="field-label">Вид затрат</label>
-            <div class="kind-toggle">
-                <label class="kind kind-fixed">
-                    <input type="radio" name="cost_kind" value="fixed"
-                           {{ if or (not .HasDraft) (eq .Draft.KindValue "fixed") }}checked{{ end }}>
-                    Постоянные
-                </label>
-                <label class="kind kind-variable">
-                    <input type="radio" name="cost_kind" value="variable"
-                           {{ if and .HasDraft (eq .Draft.KindValue "variable") }}checked{{ end }}>
-                    Переменные
-                </label>
-            </div>
-
-            <label class="field-label">Описание вида затрат</label>
-            <textarea class="field" name="description" rows="2">{{ if .HasDraft }}{{ .Draft.ShortDescription }}{{ end }}</textarea>
-
-            <label class="field-label">Полное описание</label>
-            <textarea class="field" name="full_description" rows="3">{{ if .HasDraft }}{{ .Draft.FullDescription }}{{ end }}</textarea>
-
-            <label class="field-label">Нормативное значение, ₽/мес</label>
-            <input class="field" type="number" name="amount_monthly" step="0.01"
-                   value="{{ if .HasDraft }}{{ .Draft.AmountValue }}{{ end }}">
-
-            <button type="submit" class="btn">{{ if .HasDraft }}Опубликовать{{ else }}Далее{{ end }}</button>
+            <label class="field-label">Название вида затрат</label>
+            <input class="field" type="text" name="cost_name" required placeholder="Например: Аренда помещения">
+            <button type="submit" class="btn" style="margin-top:16px">Далее</button>
         </div>
     </form>
+
+    {{ else }}
+    <!-- ШАГ 2: черновик уже есть → поля заполнены, краткое описание + 2 поля по теме → «Опубликовать» -->
+    <div class="card">
+        <b class="card-title">Фото и видео</b>
+        <div class="media-stack">
+            <div class="media-zone static">
+                <span class="media-preview"><img src="{{ .ImageURL }}" alt=""
+                      onerror="this.onerror=null;this.src='/static/media/default-image.png';"></span>
+            </div>
+            <div class="media-zone static">
+                <span class="media-preview"><video src="{{ .VideoURL }}" muted loop playsinline autoplay
+                      onerror="this.onerror=null;this.src='/static/media/default-video.mp4';"></video></span>
+            </div>
+        </div>
+    </div>
+
+    <form action="/breakeven-point/publish" method="POST">
+        <div class="card">
+            <b class="card-title">Черновик</b>
+            <label class="field-label">Название вида затрат</label>
+            <input class="field" type="text" value="{{ .Draft.CostName }}" readonly>
+
+            <label class="field-label">Краткое описание</label>
+            <textarea class="field" name="short_description" rows="3" required
+                      placeholder="Что входит в эти затраты">{{ .Draft.Description }}</textarea>
+
+            <label class="field-label">Сумма затрат, ₽/мес</label>
+            <input class="field" type="number" name="amount_monthly" step="0.01" min="0" required
+                   value="{{ .Draft.AmountValue }}">
+
+            <label class="checkbox-field">
+                <input type="checkbox" name="is_fixed" {{ if .Draft.Fixed }}checked{{ end }}>
+                <span>Постоянные затраты (не зависят от объёма выпуска)</span>
+            </label>
+
+            <button type="submit" class="btn" style="margin-top:16px">Опубликовать</button>
+        </div>
+    </form>
+    {{ end }}
 
     <nav class="bottom-nav">
         <a href="/breakeven-point/feed" class="nav-tab {{ if eq .Page "feed" }}active{{ end }}">

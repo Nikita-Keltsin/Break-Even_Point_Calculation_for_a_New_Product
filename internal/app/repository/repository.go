@@ -15,33 +15,34 @@ const (
 	DefaultVideoURL = "/static/media/default-video.mp4"
 )
 
-// ===== МОДЕЛИ (таблицы users, breakeven_types, likes) =====
+// ===== МОДЕЛИ (таблицы users, breakeven_point, likes) =====
 
 type User struct {
 	ID           uint   `gorm:"primaryKey"`
 	Username     string `gorm:"type:varchar(50);uniqueIndex;not null"`
 	PasswordHash string `gorm:"column:password_hash;type:varchar(100);not null"`
-	Email        string `gorm:"type:varchar(100)"`
+	Email        string `gorm:"type:varchar(100);not null;default:''"`
 	Role         string `gorm:"type:varchar(20);not null;default:'creator'"`
 }
 
-// BreakEvenType — услуга (вид затрат для расчёта точки безубыточности), таблица breakeven_types
-type BreakEvenType struct {
-	ID               int       `gorm:"primaryKey"`
-	CostName         string    `gorm:"type:varchar(100);not null"`
-	ShortDescription string    `gorm:"type:varchar(255)"`
-	Status           string    `gorm:"type:varchar(20);not null;default:'draft'"`
-	ImageURL         string    `gorm:"column:image_url;type:varchar(255);not null;default:''"`
-	VideoURL         string    `gorm:"column:video_url;type:varchar(255);not null;default:''"`
-	AmountMonthly    *float64  `gorm:"type:numeric(12,2)"`     // поле по теме 1
-	IsFixed          bool      `gorm:"not null;default:false"` // поле по теме 2
-	CreatedAt        time.Time `gorm:"not null;default:now()"`
-	CreatorID        int       `gorm:"not null"`
-	FormedAt         *time.Time
+// BreakEvenPoint — услуга (вид затрат для расчёта точки безубыточности), таблица breakeven_point.
+// 4 необязательных поля (NULL у черновика, заполняются при публикации):
+// short_description, amount_monthly, is_fixed, formed_at.
+type BreakEvenPoint struct {
+	ID               int        `gorm:"primaryKey"`
+	CostName         string     `gorm:"type:varchar(100);not null"`
+	ShortDescription *string    `gorm:"type:varchar(255)"` // NULL у черновика
+	Status           string     `gorm:"type:varchar(20);not null;default:'draft'"`
+	ImageURL         string     `gorm:"column:image_url;type:varchar(255);not null;default:''"`
+	VideoURL         string     `gorm:"column:video_url;type:varchar(255);not null;default:''"`
+	AmountMonthly    *float64   `gorm:"type:numeric(12,2)"` // поле по теме 1, NULL у черновика
+	IsFixed          *bool      // поле по теме 2, NULL у черновика
+	CreatedAt        time.Time  `gorm:"not null;default:now()"`
+	CreatorID        int        `gorm:"not null"`
+	FormedAt         *time.Time // дата формирования, NULL у черновика
 }
 
-// TableName — имя таблицы в БД (по умолчанию GORM назвал бы break_even_types)
-func (BreakEvenType) TableName() string { return "breakeven_types" }
+func (BreakEvenPoint) TableName() string { return "breakeven_point" }
 
 type Like struct {
 	ID     uint `gorm:"primaryKey"`
@@ -51,22 +52,36 @@ type Like struct {
 
 // ----- помощники для шаблонов -----
 
-func (c BreakEvenType) KindLabel() string {
-	if c.IsFixed {
+// Fixed — значение галочки «Постоянные затраты» (NULL у черновика = не отмечена)
+func (c BreakEvenPoint) Fixed() bool { return c.IsFixed != nil && *c.IsFixed }
+
+func (c BreakEvenPoint) KindLabel() string {
+	if c.IsFixed == nil {
+		return "—"
+	}
+	if *c.IsFixed {
 		return "Постоянные"
 	}
 	return "Переменные"
 }
 
-func (c BreakEvenType) AmountText() string {
+// Description — краткое описание (” если NULL у черновика)
+func (c BreakEvenPoint) Description() string {
+	if c.ShortDescription == nil {
+		return ""
+	}
+	return *c.ShortDescription
+}
+
+func (c BreakEvenPoint) AmountText() string {
 	if c.AmountMonthly == nil {
 		return "—"
 	}
 	return formatMoney(int(*c.AmountMonthly)) + " ₽/мес"
 }
 
-func (c BreakEvenType) AmountValue() string {
-	if c.AmountMonthly == nil {
+func (c BreakEvenPoint) AmountValue() string {
+	if c.AmountMonthly == nil { // у черновика сумма ещё не введена
 		return ""
 	}
 	return strconv.FormatFloat(*c.AmountMonthly, 'f', -1, 64)
@@ -77,14 +92,14 @@ type Repository struct{ DB *gorm.DB }
 func NewRepository(db *gorm.DB) (*Repository, error) { return &Repository{DB: db}, nil }
 
 // Пустой url в БД → фото/видео по умолчанию с SSR
-func (r *Repository) ImageURL(c BreakEvenType) string {
+func (r *Repository) ImageURL(c BreakEvenPoint) string {
 	if c.ImageURL == "" {
 		return DefaultImageURL
 	}
 	return c.ImageURL
 }
 
-func (r *Repository) VideoURL(c BreakEvenType) string {
+func (r *Repository) VideoURL(c BreakEvenPoint) string {
 	if c.VideoURL == "" {
 		return DefaultVideoURL
 	}
@@ -95,7 +110,7 @@ func (r *Repository) VideoURL(c BreakEvenType) string {
 
 // GetPublishedCosts — поиск/фильтрация опубликованных услуг (ORM, фильтр в SQL WHERE)
 // kind: "fixed" | "variable" | "" (все)
-func (r *Repository) GetPublishedCosts(from, to float64, hasFrom, hasTo bool, kind string) ([]BreakEvenType, error) {
+func (r *Repository) GetPublishedCosts(from, to float64, hasFrom, hasTo bool, kind string) ([]BreakEvenPoint, error) {
 	q := r.DB.Where("status = ?", "published")
 	if hasFrom {
 		q = q.Where("amount_monthly >= ?", from)
@@ -109,13 +124,13 @@ func (r *Repository) GetPublishedCosts(from, to float64, hasFrom, hasTo bool, ki
 	case "variable":
 		q = q.Where("is_fixed = ?", false)
 	}
-	var res []BreakEvenType
+	var res []BreakEvenPoint
 	return res, q.Order("id ASC").Find(&res).Error
 }
 
 // GetFeedCost — ЛЕНТА: из БД возвращается ровно одна строка (First = LIMIT 1)
-func (r *Repository) GetFeedCost(id int) (BreakEvenType, error) {
-	var c BreakEvenType
+func (r *Repository) GetFeedCost(id int) (BreakEvenPoint, error) {
+	var c BreakEvenPoint
 	q := r.DB.Where("status = ?", "published")
 	if id > 0 {
 		q = q.Where("id = ?", id)
@@ -124,8 +139,8 @@ func (r *Repository) GetFeedCost(id int) (BreakEvenType, error) {
 }
 
 // GetNextFeedCost — следующая опубликованная после id (одна строка); в конце ленты — первая
-func (r *Repository) GetNextFeedCost(id int) (BreakEvenType, error) {
-	var c BreakEvenType
+func (r *Repository) GetNextFeedCost(id int) (BreakEvenPoint, error) {
+	var c BreakEvenPoint
 	err := r.DB.Where("status = ? AND id > ?", "published", id).Order("id ASC").First(&c).Error
 	if err != nil {
 		return r.GetFeedCost(0)
@@ -145,8 +160,8 @@ func (r *Repository) HasLiked(uid, costID int) bool {
 	return n > 0
 }
 
-func (r *Repository) GetDraftByUser(uid int) (*BreakEvenType, error) {
-	var c BreakEvenType
+func (r *Repository) GetDraftByUser(uid int) (*BreakEvenPoint, error) {
+	var c BreakEvenPoint
 	err := r.DB.Where("creator_id = ? AND status = ?", uid, "draft").First(&c).Error
 	if err != nil {
 		return nil, err
@@ -157,7 +172,7 @@ func (r *Repository) GetDraftByUser(uid int) (*BreakEvenType, error) {
 // CreateDraft — «Далее»: создаём черновик только с названием (ORM).
 // Фото и видео в ЛР-2 не сохраняются → url пустые → показываются файлы по умолчанию.
 func (r *Repository) CreateDraft(uid int, name string) error {
-	c := BreakEvenType{CostName: name, Status: "draft", CreatorID: uid}
+	c := BreakEvenPoint{CostName: name, Status: "draft", CreatorID: uid}
 	return r.DB.Create(&c).Error
 }
 
@@ -167,7 +182,7 @@ func (r *Repository) PublishDraft(uid int, description string, amount float64, i
 	if err != nil {
 		return err
 	}
-	return r.DB.Model(&BreakEvenType{}).Where("id = ?", draft.ID).Updates(map[string]interface{}{
+	return r.DB.Model(&BreakEvenPoint{}).Where("id = ?", draft.ID).Updates(map[string]interface{}{
 		"short_description": description,
 		"amount_monthly":    amount,
 		"is_fixed":          isFixed,
@@ -182,7 +197,7 @@ func (r *Repository) DeleteCostSQL(id int) error {
 	if err != nil {
 		return err
 	}
-	res, err := sqlDB.Exec("UPDATE breakeven_types SET status = 'deleted' WHERE id = $1 AND status <> 'deleted'", id)
+	res, err := sqlDB.Exec("UPDATE breakeven_point SET status = 'deleted' WHERE id = $1 AND status <> 'deleted'", id)
 	if err != nil {
 		return err
 	}
@@ -194,18 +209,18 @@ func (r *Repository) DeleteCostSQL(id int) error {
 
 // ===== ЛР-3: ORM для веб-сервиса =====
 
-func (r *Repository) GetCostByID(id int) (BreakEvenType, error) {
-	var c BreakEvenType
+func (r *Repository) GetCostByID(id int) (BreakEvenPoint, error) {
+	var c BreakEvenPoint
 	return c, r.DB.First(&c, id).Error
 }
 
 func (r *Repository) UpdateCost(id int, updates map[string]interface{}) error {
-	return r.DB.Model(&BreakEvenType{}).Where("id = ?", id).Updates(updates).Error
+	return r.DB.Model(&BreakEvenPoint{}).Where("id = ?", id).Updates(updates).Error
 }
 
 // SoftDeleteCost — DELETE в API: только смена статуса (soft delete) через ORM
 func (r *Repository) SoftDeleteCost(id int) error {
-	return r.DB.Model(&BreakEvenType{}).Where("id = ? AND status <> ?", id, "deleted").
+	return r.DB.Model(&BreakEvenPoint{}).Where("id = ? AND status <> ?", id, "deleted").
 		Update("status", "deleted").Error
 }
 
@@ -220,8 +235,8 @@ func (r *Repository) SetLike(uid, costID int, set bool) error {
 	return r.DB.Where("user_id = ? AND cost_id = ?", uid, costID).Delete(&Like{}).Error
 }
 
-func (r *Repository) CreateDraftWithMedia(uid int, name, imageKey, videoKey string) (*BreakEvenType, error) {
-	c := BreakEvenType{CostName: name, Status: "draft", CreatorID: uid, ImageURL: imageKey, VideoURL: videoKey}
+func (r *Repository) CreateDraftWithMedia(uid int, name, imageKey, videoKey string) (*BreakEvenPoint, error) {
+	c := BreakEvenPoint{CostName: name, Status: "draft", CreatorID: uid, ImageURL: imageKey, VideoURL: videoKey}
 	if err := r.DB.Create(&c).Error; err != nil {
 		return nil, err
 	}

@@ -1,0 +1,360 @@
+{
+  "info": {
+    "_postman_id": "8865985b-f4b4-4809-a801-4792015ee739",
+    "name": "breakeven_point",
+    "description": "ЛР-3/ЛР-4: веб-сервис расчёта точки безубыточности. 10 методов: домен breakeven_point (7) + домен users (3).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Домен breakeven_point /api/breakeven_point",
+      "item": [
+        {
+          "name": "1. GET список видов затрат (фильтр)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/breakeven_point?min_amount=100000&max_amount=5000000&is_fixed=1",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "breakeven_point"
+              ],
+              "query": [
+                {
+                  "key": "min_amount",
+                  "value": "100000"
+                },
+                {
+                  "key": "max_amount",
+                  "value": "5000000"
+                },
+                {
+                  "key": "is_fixed",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Опубликованные услуги, фильтр на бэкенде: сумма от/до, is_fixed=1 — постоянные, 0 — переменные."
+          },
+          "response": []
+        },
+        {
+          "name": "2. GET лента (без id / ?id=1&next=true)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/breakeven_point/feed?id={{feedId}}&next=true",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "breakeven_point",
+                "feed"
+              ],
+              "query": [
+                {
+                  "key": "id",
+                  "value": "{{feedId}}"
+                },
+                {
+                  "key": "next",
+                  "value": "true"
+                }
+              ]
+            },
+            "description": "Без параметров (снимите галочки id и next) — первая опубликованная. С id и next=true — следующая после id. Из БД читается одна строка. is_liked = 0/1 — стоит ли лайк текущего пользователя (в списке вместо него is_mine = 0/1 — своя ли карточка)."
+          },
+          "response": []
+        },
+        {
+          "name": "3. GET черновик текущего пользователя",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/breakeven_point/draft",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "breakeven_point",
+                "draft"
+              ]
+            },
+            "description": "id не передаётся: черновик ищется по пользователю из функции-singleton."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('draftId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "4. POST добавить вид затрат + фото и видео",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/breakeven_point",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "breakeven_point"
+              ]
+            },
+            "description": "multipart/form-data: name + файлы image и video. Файлы сохраняются в MinIO под латинскими именами, имена — в image_url/video_url.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Аренда склада",
+                  "type": "text"
+                },
+                {
+                  "key": "image",
+                  "type": "file",
+                  "src": []
+                },
+                {
+                  "key": "video",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201 || pm.response.code === 200) {",
+                  "  pm.collectionVariables.set('draftId', pm.response.json().id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. PUT опубликовать вид затрат",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/breakeven_point/{{draftId}}/publish",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "breakeven_point",
+                "{{draftId}}",
+                "publish"
+              ]
+            },
+            "description": "Краткое описание + 2 поля по теме. Только свой черновик, draft → published.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"short_description\": \"Аренда склада готовой продукции, фиксированная ставка\",\n  \"amount_monthly\": 350000,\n  \"is_fixed\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6. DELETE удалить вид затрат (soft delete)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/breakeven_point/{{draftId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "breakeven_point",
+                "{{draftId}}"
+              ]
+            },
+            "description": "Только своя услуга, статус → deleted."
+          },
+          "response": []
+        },
+        {
+          "name": "7. POST лайк 0/1",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/breakeven_point/{{feedId}}/like",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "breakeven_point",
+                "{{feedId}}",
+                "like"
+              ]
+            },
+            "description": "{\"like\":1} ставит лайк, {\"like\":0} отменяет.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"like\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Домен users /api/users",
+      "item": [
+        {
+          "name": "8. POST регистрация",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "register"
+              ]
+            },
+            "description": "201 {id, username}; 409 если логин занят.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"new_user\",\n  \"password\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "9. POST аутентификация (заглушка ЛР-4)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "login"
+              ]
+            },
+            "description": "Заглушка, реализуется в ЛР-4.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"ivanov\",\n  \"password\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "10. POST деавторизация (заглушка ЛР-4)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "users",
+                "logout"
+              ]
+            },
+            "description": "Заглушка, реализуется в ЛР-4."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "feedId",
+      "value": "1"
+    },
+    {
+      "key": "draftId",
+      "value": ""
+    }
+  ]
+}

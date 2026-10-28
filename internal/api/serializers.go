@@ -4,22 +4,41 @@ import "time"
 
 // ===== СЕРИАЛИЗАТОРЫ (то, что уходит клиенту и приходит от клиента) =====
 
-// BreakEvenTypeJSON — услуга (вид затрат, таблица breakeven_types) в ответах API.
+// BreakEvenPointJSON — общие поля вида затрат (таблица breakeven_point) в ответах API.
 // Статус на клиент не передаётся; удалённые записи не отдаются вовсе.
-type BreakEvenTypeJSON struct {
+type BreakEvenPointJSON struct {
 	ID               int        `json:"id"`
 	CostName         string     `json:"cost_name"`
-	ShortDescription string     `json:"short_description"`
-	ImageURL         string     `json:"image_url"` // "" → клиент показывает фото по умолчанию
-	VideoURL         string     `json:"video_url"` // "" → клиент показывает видео по умолчанию
-	AmountMonthly    *float64   `json:"amount_monthly"`
-	IsFixed          bool       `json:"is_fixed"`
+	ShortDescription *string    `json:"short_description"` // null у черновика
+	ImageURL         string     `json:"image_url"`         // "" → клиент показывает фото по умолчанию
+	VideoURL         string     `json:"video_url"`         // "" → клиент показывает видео по умолчанию
+	AmountMonthly    *float64   `json:"amount_monthly"`    // null у черновика
+	IsFixed          *bool      `json:"is_fixed"`          // null у черновика
 	CreatorID        int        `json:"creator_id"`
 	CreatedAt        time.Time  `json:"created_at"`
-	FormedAt         *time.Time `json:"formed_at"`
+	FormedAt         *time.Time `json:"formed_at"` // null у черновика
 	LikesCount       int64      `json:"likes_count"`
-	Like             int        `json:"like"`    // 0/1 — поставил ли текущий пользователь лайк
-	IsMine           int        `json:"is_mine"` // 0/1 — карточка текущего пользователя
+}
+
+// BreakEvenPointListJSON — карточка СПИСКА (плитка «Виды затрат»):
+// is_mine = 0/1 — карточка текущего пользователя (по нему показывается кнопка «Удалить»)
+type BreakEvenPointListJSON struct {
+	BreakEvenPointJSON
+	IsMine int `json:"is_mine"`
+}
+
+// BreakEvenPointFeedJSON — карточка ЛЕНТЫ:
+// is_liked = 0/1 — поставил ли текущий пользователь лайк (по нему закрашено сердечко
+// и клиент решает, что отправить в POST /like: 1 или 0)
+type BreakEvenPointFeedJSON struct {
+	BreakEvenPointJSON
+	IsLiked int `json:"is_liked"`
+}
+
+// LikeResponse — ответ POST /api/breakeven_point/:id/like
+type LikeResponse struct {
+	IsLiked    int   `json:"is_liked"`
+	LikesCount int64 `json:"likes_count"`
 }
 
 type UserJSON struct {
