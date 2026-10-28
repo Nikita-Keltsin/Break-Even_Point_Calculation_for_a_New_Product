@@ -33,7 +33,7 @@ go run ./cmd/Break-Even_Point_Calculation_for_a_New_Product   # Swagger: http://
 
 - `POST /api/users/login` проверяет пароль (bcrypt) и выдаёт JWT (HS256, срок 1 час): `{access_token, token_type: "Bearer", expires_in}`.
 - Токен передаётся в заголовке `Authorization: Bearer <access_token>`.
-- `POST /api/users/logout` кладёт токен в Redis с ключом `blacklist:<токен>` (значение — id пользователя) до конца срока его действия; такой токен больше не принимается.
+- `POST /api/users/logout` кладёт в Redis ключ `blacklist:<jti>` (jti — короткий ID токена из его payload, значение — id пользователя) до конца срока действия токена; такой токен больше не принимается.
 - Функция-singleton из ЛР-3 удалена: пользователь берётся из JWT (`currentUserID(ctx)`), при создании вида затрат он автоматически записывается в `creator_id`.
 - Пароль при регистрации хранится bcrypt-хэшем.
 
@@ -41,8 +41,8 @@ go run ./cmd/Break-Even_Point_Calculation_for_a_New_Product   # Swagger: http://
 
 | № | Метод | URL | Гость | Создатель |
 |---|---|---|---|---|
-| 1 | GET | `/api/breakeven_point?min_amount=&max_amount=&is_fixed=0\|1` | да | да (+ like, is_mine) |
-| 2 | GET | `/api/breakeven_point/feed`, `?id=1&next=true`, `/feed/:id` | да | да |
+| 1 | GET | `/api/breakeven_point?min_amount=&max_amount=&is_fixed=0\|1` | да | да (+ is_mine) |
+| 2 | GET | `/api/breakeven_point/feed`, `?id=1&next=true`, `/feed/:id` | да | да (+ is_liked) |
 | 3 | GET | `/api/breakeven_point/draft` | 401 | да |
 | 4 | POST | `/api/breakeven_point` (multipart: name, image, video) | 401 | да |
 | 5 | PUT | `/api/breakeven_point/:id/publish` | 401 | да (только свой черновик, иначе 403) |
@@ -56,14 +56,14 @@ go run ./cmd/Break-Even_Point_Calculation_for_a_New_Product   # Swagger: http://
 
 Коллекция Postman: `breakeven_point.postman_collection.json`. Токен при тестировании указывается **вручную в заголовке каждого запроса**: вкладка Headers → `Authorization: Bearer <JWT из ответа POST /api/users/login>` (белая галочка — заголовок отправляется, снятая — запрос гостя). Вкладка Authorization (No Auth) и меню Cookies не используются.
 
-Redis: `docker exec -it redis_store redis-cli -a redispassword` → `KEYS blacklist:*`, `GET blacklist:<токен>`, `TTL blacklist:<токен>`.
+Redis: `bash redis_blacklist.sh` (или `docker exec -it redis_store redis-cli -a redispassword` → `KEYS blacklist:*`, `GET blacklist:<jti>`, `TTL blacklist:<jti>`).
 
 ## Таблицы БД
 
-**users**: `id` SERIAL PK · `username` VARCHAR(50) NOT NULL UNIQUE · `password_hash` VARCHAR(100) NOT NULL (bcrypt) · `email` VARCHAR(100) · `role` VARCHAR(20) NOT NULL
+**users**: `id` SERIAL PK · `username` VARCHAR(50) NOT NULL UNIQUE · `password_hash` VARCHAR(100) NOT NULL (bcrypt) · `email` VARCHAR(100) NOT NULL · `role` VARCHAR(20) NOT NULL
 
-**breakeven_types**: `id` SERIAL PK · `cost_name` VARCHAR(100) NOT NULL · `short_description` VARCHAR(255) · `status` VARCHAR(20) NOT NULL (draft/published/deleted) · `image_url` VARCHAR(255) NOT NULL · `video_url` VARCHAR(255) NOT NULL · `amount_monthly` NUMERIC(12,2) · `is_fixed` BOOLEAN NOT NULL · `created_at` TIMESTAMP NOT NULL · `creator_id` INT NOT NULL FK → users.id · `formed_at` TIMESTAMP
+**breakeven_point**: `id` SERIAL PK · `cost_name` VARCHAR(100) NOT NULL · `short_description` VARCHAR(255) NULL · `status` VARCHAR(20) NOT NULL (draft/published/deleted) · `image_url` VARCHAR(255) NOT NULL · `video_url` VARCHAR(255) NOT NULL · `amount_monthly` NUMERIC(12,2) NULL · `is_fixed` BOOLEAN NULL · `created_at` TIMESTAMP NOT NULL · `creator_id` INT NOT NULL FK → users.id · `formed_at` TIMESTAMP NULL
 
-**likes** (м-м): `id` SERIAL PK · `user_id` INT FK → users.id · `cost_id` INT FK → breakeven_types.id · UNIQUE(user_id, cost_id)
+**likes** (м-м): `id` SERIAL PK · `user_id` INT FK → users.id · `cost_id` INT FK → breakeven_point.id · UNIQUE(user_id, cost_id)
 
-Все внешние ключи — ON DELETE RESTRICT.
+Необязательных полей 4 — поля публикации `short_description`, `amount_monthly`, `is_fixed`, `formed_at`: у черновика они NULL и заполняются при публикации. Остальные столбцы NOT NULL. Все внешние ключи — ON DELETE RESTRICT.

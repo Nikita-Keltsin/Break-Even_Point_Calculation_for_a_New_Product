@@ -1,8 +1,9 @@
 basePath: /
 definitions:
-  api.BreakEvenTypeJSON:
+  api.BreakEvenPointFeedJSON:
     properties:
       amount_monthly:
+        description: null у черновика
         type: number
       cost_name:
         type: string
@@ -11,6 +12,7 @@ definitions:
       creator_id:
         type: integer
       formed_at:
+        description: null у черновика
         type: string
       id:
         type: integer
@@ -18,16 +20,78 @@ definitions:
         description: '"" → клиент показывает фото по умолчанию'
         type: string
       is_fixed:
+        description: null у черновика
         type: boolean
-      is_mine:
-        description: 0/1 — карточка текущего пользователя
-        type: integer
-      like:
-        description: 0/1 — поставил ли текущий пользователь лайк
+      is_liked:
         type: integer
       likes_count:
         type: integer
       short_description:
+        description: null у черновика
+        type: string
+      video_url:
+        description: '"" → клиент показывает видео по умолчанию'
+        type: string
+    type: object
+  api.BreakEvenPointJSON:
+    properties:
+      amount_monthly:
+        description: null у черновика
+        type: number
+      cost_name:
+        type: string
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      formed_at:
+        description: null у черновика
+        type: string
+      id:
+        type: integer
+      image_url:
+        description: '"" → клиент показывает фото по умолчанию'
+        type: string
+      is_fixed:
+        description: null у черновика
+        type: boolean
+      likes_count:
+        type: integer
+      short_description:
+        description: null у черновика
+        type: string
+      video_url:
+        description: '"" → клиент показывает видео по умолчанию'
+        type: string
+    type: object
+  api.BreakEvenPointListJSON:
+    properties:
+      amount_monthly:
+        description: null у черновика
+        type: number
+      cost_name:
+        type: string
+      created_at:
+        type: string
+      creator_id:
+        type: integer
+      formed_at:
+        description: null у черновика
+        type: string
+      id:
+        type: integer
+      image_url:
+        description: '"" → клиент показывает фото по умолчанию'
+        type: string
+      is_fixed:
+        description: null у черновика
+        type: boolean
+      is_mine:
+        type: integer
+      likes_count:
+        type: integer
+      short_description:
+        description: null у черновика
         type: string
       video_url:
         description: '"" → клиент показывает видео по умолчанию'
@@ -42,7 +106,7 @@ definitions:
     type: object
   api.LikeResponse:
     properties:
-      like:
+      is_liked:
         type: integer
       likes_count:
         type: integer
@@ -107,7 +171,7 @@ paths:
   /api/breakeven_point:
     get:
       description: Только опубликованные. Фильтрация на бэкенде. Доступно всем; с
-        токеном заполняются like и is_mine.
+        токеном заполняется is_mine (своя карточка).
       parameters:
       - description: Сумма от, ₽/мес
         in: query
@@ -131,7 +195,7 @@ paths:
           description: OK
           schema:
             items:
-              $ref: '#/definitions/api.BreakEvenTypeJSON'
+              $ref: '#/definitions/api.BreakEvenPointListJSON'
             type: array
       summary: Список видов затрат с фильтром
       tags:
@@ -161,7 +225,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/api.BreakEvenTypeJSON'
+            $ref: '#/definitions/api.BreakEvenPointJSON'
         "400":
           description: нет названия
         "401":
@@ -255,7 +319,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.BreakEvenTypeJSON'
+            $ref: '#/definitions/api.BreakEvenPointJSON'
         "400":
           description: неверное тело запроса
         "401":
@@ -279,7 +343,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.BreakEvenTypeJSON'
+            $ref: '#/definitions/api.BreakEvenPointJSON'
         "401":
           description: нет токена
         "404":
@@ -292,7 +356,8 @@ paths:
   /api/breakeven_point/feed:
     get:
       description: Без id — первый опубликованный; с id — по id; с id и next=true
-        — следующий после id. Доступно всем.
+        — следующий после id. В ответе is_liked = 0/1 — лайк текущего пользователя.
+        Доступно всем.
       parameters:
       - description: id вида затрат
         in: query
@@ -308,7 +373,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/api.BreakEvenTypeJSON'
+            $ref: '#/definitions/api.BreakEvenPointFeedJSON'
         "404":
           description: не найден или удалён
       summary: 'Лента: один вид затрат'
@@ -342,8 +407,8 @@ paths:
       - users
   /api/users/logout:
     post:
-      description: Кладёт текущий JWT в blacklist Redis до окончания срока его действия.
-        Доступно создателю.
+      description: Кладёт jti текущего JWT в blacklist Redis до окончания срока его
+        действия. Доступно создателю.
       responses:
         "200":
           description: токен отозван

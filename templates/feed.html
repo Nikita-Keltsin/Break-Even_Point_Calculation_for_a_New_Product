@@ -24,10 +24,10 @@
 
     <div class="feed-overlay">
         <h1 class="feed-title">{{ .Cost.CostName }}</h1>
-        <p class="feed-desc">{{ .Cost.ShortDescription }}</p>
+        <p class="feed-desc">{{ .Cost.Description }}</p>
         <div class="feed-chips">
             <div class="feed-chip"><span>СУММА</span><b>{{ .Cost.AmountText }}</b></div>
-            <div class="feed-chip"><span>ВИД ЗАТРАТ</span><b>{{ if .Cost.IsFixed }}☑{{ else }}☐{{ end }} {{ .Cost.KindLabel }}</b></div>
+            <div class="feed-chip"><span>ВИД ЗАТРАТ</span><b>{{ if .Cost.Fixed }}☑{{ else }}☐{{ end }} {{ .Cost.KindLabel }}</b></div>
         </div>
     </div>
 

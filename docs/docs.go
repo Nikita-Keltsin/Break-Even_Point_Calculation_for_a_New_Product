@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/api/breakeven_point": {
             "get": {
-                "description": "Только опубликованные. Фильтрация на бэкенде. Доступно всем; с токеном заполняются like и is_mine.",
+                "description": "Только опубликованные. Фильтрация на бэкенде. Доступно всем; с токеном заполняется is_mine (своя карточка).",
                 "produces": [
                     "application/json"
                 ],
@@ -55,7 +55,7 @@ const docTemplate = `{
                         "schema": {
                             "type": "array",
                             "items": {
-                                "$ref": "#/definitions/api.BreakEvenTypeJSON"
+                                "$ref": "#/definitions/api.BreakEvenPointListJSON"
                             }
                         }
                     }
@@ -103,7 +103,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/api.BreakEvenTypeJSON"
+                            "$ref": "#/definitions/api.BreakEvenPointJSON"
                         }
                     },
                     "400": {
@@ -137,7 +137,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.BreakEvenTypeJSON"
+                            "$ref": "#/definitions/api.BreakEvenPointJSON"
                         }
                     },
                     "401": {
@@ -151,7 +151,7 @@ const docTemplate = `{
         },
         "/api/breakeven_point/feed": {
             "get": {
-                "description": "Без id — первый опубликованный; с id — по id; с id и next=true — следующий после id. Доступно всем.",
+                "description": "Без id — первый опубликованный; с id — по id; с id и next=true — следующий после id. В ответе is_liked = 0/1 — лайк текущего пользователя. Доступно всем.",
                 "produces": [
                     "application/json"
                 ],
@@ -177,7 +177,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.BreakEvenTypeJSON"
+                            "$ref": "#/definitions/api.BreakEvenPointFeedJSON"
                         }
                     },
                     "404": {
@@ -317,7 +317,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/api.BreakEvenTypeJSON"
+                            "$ref": "#/definitions/api.BreakEvenPointJSON"
                         }
                     },
                     "400": {
@@ -382,7 +382,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Кладёт текущий JWT в blacklist Redis до окончания срока его действия. Доступно создателю.",
+                "description": "Кладёт jti текущего JWT в blacklist Redis до окончания срока его действия. Доступно создателю.",
                 "tags": [
                     "users"
                 ],
@@ -439,10 +439,11 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "api.BreakEvenTypeJSON": {
+        "api.BreakEvenPointFeedJSON": {
             "type": "object",
             "properties": {
                 "amount_monthly": {
+                    "description": "null у черновика",
                     "type": "number"
                 },
                 "cost_name": {
@@ -455,6 +456,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "formed_at": {
+                    "description": "null у черновика",
                     "type": "string"
                 },
                 "id": {
@@ -465,20 +467,108 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "is_fixed": {
+                    "description": "null у черновика",
                     "type": "boolean"
                 },
-                "is_mine": {
-                    "description": "0/1 — карточка текущего пользователя",
-                    "type": "integer"
-                },
-                "like": {
-                    "description": "0/1 — поставил ли текущий пользователь лайк",
+                "is_liked": {
                     "type": "integer"
                 },
                 "likes_count": {
                     "type": "integer"
                 },
                 "short_description": {
+                    "description": "null у черновика",
+                    "type": "string"
+                },
+                "video_url": {
+                    "description": "\"\" → клиент показывает видео по умолчанию",
+                    "type": "string"
+                }
+            }
+        },
+        "api.BreakEvenPointJSON": {
+            "type": "object",
+            "properties": {
+                "amount_monthly": {
+                    "description": "null у черновика",
+                    "type": "number"
+                },
+                "cost_name": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "creator_id": {
+                    "type": "integer"
+                },
+                "formed_at": {
+                    "description": "null у черновика",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "description": "\"\" → клиент показывает фото по умолчанию",
+                    "type": "string"
+                },
+                "is_fixed": {
+                    "description": "null у черновика",
+                    "type": "boolean"
+                },
+                "likes_count": {
+                    "type": "integer"
+                },
+                "short_description": {
+                    "description": "null у черновика",
+                    "type": "string"
+                },
+                "video_url": {
+                    "description": "\"\" → клиент показывает видео по умолчанию",
+                    "type": "string"
+                }
+            }
+        },
+        "api.BreakEvenPointListJSON": {
+            "type": "object",
+            "properties": {
+                "amount_monthly": {
+                    "description": "null у черновика",
+                    "type": "number"
+                },
+                "cost_name": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "creator_id": {
+                    "type": "integer"
+                },
+                "formed_at": {
+                    "description": "null у черновика",
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "image_url": {
+                    "description": "\"\" → клиент показывает фото по умолчанию",
+                    "type": "string"
+                },
+                "is_fixed": {
+                    "description": "null у черновика",
+                    "type": "boolean"
+                },
+                "is_mine": {
+                    "type": "integer"
+                },
+                "likes_count": {
+                    "type": "integer"
+                },
+                "short_description": {
+                    "description": "null у черновика",
                     "type": "string"
                 },
                 "video_url": {
@@ -501,7 +591,7 @@ const docTemplate = `{
         "api.LikeResponse": {
             "type": "object",
             "properties": {
-                "like": {
+                "is_liked": {
                     "type": "integer"
                 },
                 "likes_count": {

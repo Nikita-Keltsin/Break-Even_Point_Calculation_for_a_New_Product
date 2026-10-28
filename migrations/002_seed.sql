@@ -6,7 +6,7 @@ INSERT INTO users (username, password_hash, email, role) VALUES
 ('sidorova', '$2a$10$Bc8jFFkFDV39Ehb2qwmfH.GFFtiuUF8t78gnYFKs2E83BnePgiEh6', 'sidorova@company.ru', 'creator');
 
 -- обязательно есть все три статуса: опубликован, удалён, черновик
-INSERT INTO breakeven_types (cost_name, short_description, status, image_url, video_url, amount_monthly, is_fixed, creator_id, formed_at) VALUES
+INSERT INTO breakeven_point (cost_name, short_description, status, image_url, video_url, amount_monthly, is_fixed, creator_id, formed_at) VALUES
 ('Операционные расходы (OPEX)', 'Аренда офиса, коммунальные платежи, клининг и охрана. Не зависят от объёма выпуска.',
  'published', 'http://localhost:9000/media/screen.png',   'http://localhost:9000/media/7426703-hd_1080_1920_25fps.mp4', 2850000, TRUE,  1, NOW()),
 ('Фонд оплаты труда (ФОТ)',     'Оклады, страховые взносы и ДМС управленческой команды; индексируются раз в год.',
@@ -19,6 +19,6 @@ INSERT INTO breakeven_types (cost_name, short_description, status, image_url, vi
  'published', '', '', 75000, FALSE, 1, NOW()),
 -- черновик другого пользователя (sidorova): у ivanov черновика нет, его создаём в демонстрации
 ('Комиссия эквайринга',         NULL,
- 'draft',     '', '', NULL, FALSE, 3, NULL);
+ 'draft',     '', '', NULL, NULL, 3, NULL);  -- 4 поля публикации у черновика NULL
 
 INSERT INTO likes (user_id, cost_id) VALUES (1,1),(2,1),(3,1),(1,2),(2,3);

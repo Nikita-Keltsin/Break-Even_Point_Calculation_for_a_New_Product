@@ -39,9 +39,9 @@ func (a *API) fullURL(key string) string {
 	return "http://" + minioEndpoint + "/" + BucketName + "/" + key
 }
 
-// toCostJSON — uid текущего пользователя (0 — гость) нужен для полей like и is_mine
-func (a *API) toCostJSON(c repository.BreakEvenType, uid int) BreakEvenTypeJSON {
-	return BreakEvenTypeJSON{
+// toCostJSON — общие поля вида затрат (черновик, добавление, публикация)
+func (a *API) toCostJSON(c repository.BreakEvenPoint) BreakEvenPointJSON {
+	return BreakEvenPointJSON{
 		ID:               c.ID,
 		CostName:         c.CostName,
 		ShortDescription: c.ShortDescription,
@@ -53,9 +53,17 @@ func (a *API) toCostJSON(c repository.BreakEvenType, uid int) BreakEvenTypeJSON 
 		CreatedAt:        c.CreatedAt,
 		FormedAt:         c.FormedAt,
 		LikesCount:       a.Repo.GetLikesCount(c.ID),
-		Like:             boolTo01(a.Repo.HasLiked(uid, c.ID)),
-		IsMine:           boolTo01(uid != 0 && c.CreatorID == uid),
 	}
+}
+
+// toListJSON — карточка списка: + is_mine (своя ли карточка), uid = 0 — гость
+func (a *API) toListJSON(c repository.BreakEvenPoint, uid int) BreakEvenPointListJSON {
+	return BreakEvenPointListJSON{BreakEvenPointJSON: a.toCostJSON(c), IsMine: boolTo01(uid != 0 && c.CreatorID == uid)}
+}
+
+// toFeedJSON — карточка ленты: + is_liked (стоит ли лайк текущего пользователя), uid = 0 — гость
+func (a *API) toFeedJSON(c repository.BreakEvenPoint, uid int) BreakEvenPointFeedJSON {
+	return BreakEvenPointFeedJSON{BreakEvenPointJSON: a.toCostJSON(c), IsLiked: boolTo01(uid != 0 && a.Repo.HasLiked(uid, c.ID))}
 }
 
 // ===================== ДОМЕН «УСЛУГА» (/api/breakeven_point) =====================
@@ -64,13 +72,13 @@ func (a *API) toCostJSON(c repository.BreakEvenType, uid int) BreakEvenTypeJSON 
 //
 // ListCosts godoc
 // @Summary      Список видов затрат с фильтром
-// @Description  Только опубликованные. Фильтрация на бэкенде. Доступно всем; с токеном заполняются like и is_mine.
+// @Description  Только опубликованные. Фильтрация на бэкенде. Доступно всем; с токеном заполняется is_mine (своя карточка).
 // @Tags         breakeven_point
 // @Produce      json
 // @Param        min_amount query number false "Сумма от, ₽/мес"
 // @Param        max_amount query number false "Сумма до, ₽/мес"
 // @Param        is_fixed   query int    false "1 — постоянные, 0 — переменные" Enums(0, 1)
-// @Success      200 {array} BreakEvenTypeJSON
+// @Success      200 {array} BreakEvenPointListJSON
 // @Router       /api/breakeven_point [get]
 func (a *API) ListCosts(ctx *gin.Context) {
 	from, err1 := strconv.ParseFloat(ctx.Query("min_amount"), 64)
@@ -89,9 +97,9 @@ func (a *API) ListCosts(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	res := make([]BreakEvenTypeJSON, 0, len(costs))
+	res := make([]BreakEvenPointListJSON, 0, len(costs))
 	for _, c := range costs {
-		res = append(res, a.toCostJSON(c, currentUserID(ctx)))
+		res = append(res, a.toListJSON(c, currentUserID(ctx)))
 	}
 	ctx.JSON(http.StatusOK, res)
 }
@@ -100,16 +108,16 @@ func (a *API) ListCosts(ctx *gin.Context) {
 //     GET /api/breakeven_point/feed/:id        — опубликованная по id
 //     GET /api/breakeven_point/feed/:id?next=1 — следующая после id (next=true тоже принимается)
 //
-// Из БД всегда читается одна строка; в ответе like=0/1 для текущего пользователя.
+// Из БД всегда читается одна строка; в ответе is_liked = 0/1 — лайк текущего пользователя.
 //
 // FeedCost godoc
 // @Summary      Лента: один вид затрат
-// @Description  Без id — первый опубликованный; с id — по id; с id и next=true — следующий после id. Доступно всем.
+// @Description  Без id — первый опубликованный; с id — по id; с id и next=true — следующий после id. В ответе is_liked = 0/1 — лайк текущего пользователя. Доступно всем.
 // @Tags         breakeven_point
 // @Produce      json
 // @Param        id   query int  false "id вида затрат"
 // @Param        next query bool false "true — следующий после id"
-// @Success      200 {object} BreakEvenTypeJSON
+// @Success      200 {object} BreakEvenPointFeedJSON
 // @Failure      404 "не найден или удалён"
 // @Router       /api/breakeven_point/feed [get]
 func (a *API) FeedCost(ctx *gin.Context) {
@@ -119,7 +127,7 @@ func (a *API) FeedCost(ctx *gin.Context) {
 	}
 	id, _ := strconv.Atoi(idStr)
 	var (
-		c   repository.BreakEvenType
+		c   repository.BreakEvenPoint
 		err error
 	)
 	if next := ctx.Query("next"); id > 0 && (next == "1" || next == "true") {
@@ -131,7 +139,7 @@ func (a *API) FeedCost(ctx *gin.Context) {
 		ctx.Status(http.StatusNotFound)
 		return
 	}
-	ctx.JSON(http.StatusOK, a.toCostJSON(c, currentUserID(ctx)))
+	ctx.JSON(http.StatusOK, a.toFeedJSON(c, currentUserID(ctx)))
 }
 
 // 3. GET /api/breakeven_point/draft — черновик текущего пользователя (не более одного), id не передаётся
@@ -142,7 +150,7 @@ func (a *API) FeedCost(ctx *gin.Context) {
 // @Tags         breakeven_point
 // @Security     BearerAuth
 // @Produce      json
-// @Success      200 {object} BreakEvenTypeJSON
+// @Success      200 {object} BreakEvenPointJSON
 // @Failure      401 "нет токена"
 // @Failure      404 "черновика нет"
 // @Router       /api/breakeven_point/draft [get]
@@ -152,7 +160,7 @@ func (a *API) GetDraft(ctx *gin.Context) {
 		ctx.Status(http.StatusNotFound)
 		return
 	}
-	ctx.JSON(http.StatusOK, a.toCostJSON(*draft, currentUserID(ctx)))
+	ctx.JSON(http.StatusOK, a.toCostJSON(*draft))
 }
 
 // 4. POST /api/breakeven_point — создание черновика: name + файлы image и video (multipart/form-data).
@@ -168,7 +176,7 @@ func (a *API) GetDraft(ctx *gin.Context) {
 // @Param        name  formData string true  "Название"
 // @Param        image formData file   false "Фото"
 // @Param        video formData file   false "Видео"
-// @Success      201 {object} BreakEvenTypeJSON
+// @Success      201 {object} BreakEvenPointJSON
 // @Failure      400 "нет названия"
 // @Failure      401 "нет токена"
 // @Failure      409 "черновик уже есть"
@@ -202,7 +210,7 @@ func (a *API) CreateCost(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	ctx.JSON(http.StatusCreated, a.toCostJSON(*c, uid))
+	ctx.JSON(http.StatusCreated, a.toCostJSON(*c))
 }
 
 // 5. PUT /api/breakeven_point/:id/publish — draft → published (только свой черновик; обратно нельзя)
@@ -216,7 +224,7 @@ func (a *API) CreateCost(ctx *gin.Context) {
 // @Produce      json
 // @Param        id   path int            true "id черновика"
 // @Param        body body PublishRequest true "Краткое описание и 2 поля по теме"
-// @Success      200 {object} BreakEvenTypeJSON
+// @Success      200 {object} BreakEvenPointJSON
 // @Failure      400 "неверное тело запроса"
 // @Failure      401 "нет токена"
 // @Failure      403 "чужая карточка или не черновик"
@@ -250,7 +258,7 @@ func (a *API) PublishCost(ctx *gin.Context) {
 		return
 	}
 	c, _ = a.Repo.GetCostByID(id)
-	ctx.JSON(http.StatusOK, a.toCostJSON(c, currentUserID(ctx)))
+	ctx.JSON(http.StatusOK, a.toCostJSON(c))
 }
 
 // 6. DELETE /api/breakeven_point/:id — только soft delete своей услуги (status = 'deleted', ORM)
@@ -315,7 +323,7 @@ func (a *API) LikeCost(ctx *gin.Context) {
 		ctx.Status(http.StatusInternalServerError)
 		return
 	}
-	ctx.JSON(http.StatusOK, LikeResponse{Like: *body.Like, LikesCount: a.Repo.GetLikesCount(id)})
+	ctx.JSON(http.StatusOK, LikeResponse{IsLiked: *body.Like, LikesCount: a.Repo.GetLikesCount(id)})
 }
 
 // ===================== ДОМЕН «ПОЛЬЗОВАТЕЛЬ» (/api/users) =====================
