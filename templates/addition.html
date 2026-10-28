@@ -84,14 +84,14 @@
 
             <label class="field-label">Краткое описание</label>
             <textarea class="field" name="short_description" rows="3" required
-                      placeholder="Что входит в эти затраты">{{ .Draft.ShortDescription }}</textarea>
+                      placeholder="Что входит в эти затраты">{{ .Draft.Description }}</textarea>
 
             <label class="field-label">Сумма затрат, ₽/мес</label>
             <input class="field" type="number" name="amount_monthly" step="0.01" min="0" required
                    value="{{ .Draft.AmountValue }}">
 
             <label class="checkbox-field">
-                <input type="checkbox" name="is_fixed" {{ if .Draft.IsFixed }}checked{{ end }}>
+                <input type="checkbox" name="is_fixed" {{ if .Draft.Fixed }}checked{{ end }}>
                 <span>Постоянные затраты (не зависят от объёма выпуска)</span>
             </label>
 

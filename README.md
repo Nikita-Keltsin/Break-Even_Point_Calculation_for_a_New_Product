@@ -40,10 +40,10 @@ go run ./cmd/Break-Even_Point_Calculation_for_a_New_Product   # http://localhost
 
 ## Таблицы БД
 
-**users** — пользователи: `id` SERIAL PK · `username` VARCHAR(50) NOT NULL UNIQUE · `password_hash` VARCHAR(100) NOT NULL · `email` VARCHAR(100) · `role` VARCHAR(20) NOT NULL
+**users** — пользователи: `id` SERIAL PK · `username` VARCHAR(50) NOT NULL UNIQUE · `password_hash` VARCHAR(100) NOT NULL · `email` VARCHAR(100) NOT NULL · `role` VARCHAR(20) NOT NULL
 
-**breakeven_types** — услуги (виды затрат): `id` SERIAL PK · `cost_name` VARCHAR(100) NOT NULL · `short_description` VARCHAR(255) · `status` VARCHAR(20) NOT NULL (draft / published / deleted) · `image_url` VARCHAR(255) NOT NULL · `video_url` VARCHAR(255) NOT NULL · `amount_monthly` NUMERIC(12,2) · `is_fixed` BOOLEAN NOT NULL · `created_at` TIMESTAMP NOT NULL · `creator_id` INT NOT NULL FK → users.id · `formed_at` TIMESTAMP
+**breakeven_point** — услуги (виды затрат): `id` SERIAL PK · `cost_name` VARCHAR(100) NOT NULL · `short_description` VARCHAR(255) NULL · `status` VARCHAR(20) NOT NULL (draft / published / deleted) · `image_url` VARCHAR(255) NOT NULL · `video_url` VARCHAR(255) NOT NULL · `amount_monthly` NUMERIC(12,2) NULL · `is_fixed` BOOLEAN NULL · `created_at` TIMESTAMP NOT NULL · `creator_id` INT NOT NULL FK → users.id · `formed_at` TIMESTAMP NULL
 
-**likes** — лайки, м-м пользователь — услуга: `id` SERIAL PK · `user_id` INT FK → users.id · `cost_id` INT FK → breakeven_types.id · UNIQUE(user_id, cost_id)
+**likes** — лайки, м-м пользователь — услуга: `id` SERIAL PK · `user_id` INT FK → users.id · `cost_id` INT FK → breakeven_point.id · UNIQUE(user_id, cost_id)
 
-Каскадное удаление запрещено (все FK — ON DELETE RESTRICT). В тестовых данных есть услуги во всех трёх статусах. У пользователя не более одного черновика (частичный уникальный индекс).
+Необязательных полей 4 — поля публикации `short_description`, `amount_monthly`, `is_fixed`, `formed_at`: у черновика они NULL и заполняются при публикации. Остальные столбцы NOT NULL. Каскадное удаление запрещено (все FK — ON DELETE RESTRICT). В тестовых данных есть услуги во всех трёх статусах. У пользователя не более одного черновика (частичный уникальный индекс).
