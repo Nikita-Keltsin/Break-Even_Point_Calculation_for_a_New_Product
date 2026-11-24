@@ -118,6 +118,67 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/breakeven_point/catalog": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakeven_point"
+                ],
+                "summary": "Постраничный каталог опубликованных видов затрат",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "Сумма от, ₽/мес",
+                        "name": "min_amount",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Сумма до, ₽/мес",
+                        "name": "max_amount",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            0,
+                            1
+                        ],
+                        "type": "integer",
+                        "description": "Тип затрат",
+                        "name": "is_fixed",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "Номер страницы",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "maximum": 100,
+                        "type": "integer",
+                        "default": 24,
+                        "description": "Карточек на странице",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/api.CatalogPage"
+                        }
+                    },
+                    "400": {
+                        "description": "некорректные параметры каталога"
+                    }
+                }
+            }
+        },
         "/api/breakeven_point/draft": {
             "get": {
                 "security": [
@@ -151,7 +212,7 @@ const docTemplate = `{
         },
         "/api/breakeven_point/feed": {
             "get": {
-                "description": "Без id — первый опубликованный; с id — по id; с id и next=true — следующий после id. В ответе is_liked = 0/1 — лайк текущего пользователя. Доступно всем.",
+                "description": "Без id возвращает текущую карточку сессии, с id читает карточку напрямую. С id и next=true выдаёт следующую карточку сессии.",
                 "produces": [
                     "application/json"
                 ],
@@ -168,9 +229,15 @@ const docTemplate = `{
                     },
                     {
                         "type": "boolean",
-                        "description": "true — следующий после id",
+                        "description": "Перейти к следующей карточке",
                         "name": "next",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Идентификатор сессии (32 hex-символа)",
+                        "name": "X-Feed-Session",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -182,6 +249,39 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "не найден или удалён"
+                    }
+                }
+            }
+        },
+        "/api/breakeven_point/feed/session": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "breakeven_point"
+                ],
+                "summary": "Подготовить порцию сессионной ленты",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Идентификатор сессии (32 hex-символа)",
+                        "name": "X-Feed-Session",
+                        "in": "header"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "хранилище недоступно"
                     }
                 }
             }
@@ -446,6 +546,12 @@ const docTemplate = `{
                     "description": "null у черновика",
                     "type": "number"
                 },
+                "batch": {
+                    "type": "integer"
+                },
+                "batch_size": {
+                    "type": "integer"
+                },
                 "cost_name": {
                     "type": "string"
                 },
@@ -474,6 +580,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "likes_count": {
+                    "type": "integer"
+                },
+                "position": {
                     "type": "integer"
                 },
                 "short_description": {
@@ -574,6 +683,26 @@ const docTemplate = `{
                 "video_url": {
                     "description": "\"\" → клиент показывает видео по умолчанию",
                     "type": "string"
+                }
+            }
+        },
+        "api.CatalogPage": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/api.BreakEvenPointListJSON"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
                 }
             }
         },

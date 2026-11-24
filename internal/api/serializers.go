@@ -32,7 +32,10 @@ type BreakEvenPointListJSON struct {
 // и клиент решает, что отправить в POST /like: 1 или 0)
 type BreakEvenPointFeedJSON struct {
 	BreakEvenPointJSON
-	IsLiked int `json:"is_liked"`
+	IsLiked   int `json:"is_liked"`
+	Batch     int `json:"batch"`
+	Position  int `json:"position"`
+	BatchSize int `json:"batch_size"`
 }
 
 // LikeResponse — ответ POST /api/breakeven_point/:id/like

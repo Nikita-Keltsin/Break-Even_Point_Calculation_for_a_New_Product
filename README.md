@@ -67,3 +67,17 @@ Redis: `bash redis_blacklist.sh` (или `docker exec -it redis_store redis-cli 
 **likes** (м-м): `id` SERIAL PK · `user_id` INT FK → users.id · `cost_id` INT FK → breakeven_point.id · UNIQUE(user_id, cost_id)
 
 Необязательных полей 4 — поля публикации `short_description`, `amount_monthly`, `is_fixed`, `formed_at`: у черновика они NULL и заполняются при публикации. Остальные столбцы NOT NULL. Все внешние ключи — ON DELETE RESTRICT.
+
+## Дополнительное задание по индексам
+
+После запуска инфраструктуры и применения миграций 001–004 выполните в учебной базе:
+
+```bash
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d breakeven_db < migrations/005_catalog_indexes.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d breakeven_db < demo/seed.sql
+docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d breakeven_db < demo/index-comparison.sql
+```
+
+`GET /api/breakeven_point/catalog` принимает `page`, `page_size`, `min_amount`, `max_amount` и `is_fixed`. Размер страницы по умолчанию 24, максимум 100. Ответ содержит `items`, `total`, `page` и `page_size`. Планы сравниваются в транзакции с откатом удаления индексов.
+
+`GET /api/breakeven_point/feed/session` создаёт порцию из 100 уникальных ID при достаточном количестве карточек. При исчерпании порции Redis сохраняет новую. Для проверки ключей используйте `redis-cli --scan --pattern 'feed:*'`. Для демонстрации в React используйте ветку `extra-db-indexes` фронтенда.

@@ -64,6 +64,8 @@ func StartServer() {
 		bep := apiR.Group("/breakeven_point") // домен breakeven_point (услуга — вид затрат)
 		// гость и создатель: только чтение (с токеном заполняются like и is_mine)
 		bep.GET("", a.WithOptionalAuth, a.ListCosts)
+		bep.GET("/catalog", a.WithOptionalAuth, a.Catalog)
+		bep.GET("/feed/session", a.WithOptionalAuth, a.InitFeed)
 		bep.GET("/feed", a.WithOptionalAuth, a.FeedCost)
 		bep.GET("/feed/:id", a.WithOptionalAuth, a.FeedCost)
 		// только создатель (JWT обязателен, иначе 401)

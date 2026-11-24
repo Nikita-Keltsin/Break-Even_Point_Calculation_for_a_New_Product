@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/minio/minio-go/v7"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 )
 
 // ЛР-4: функция-singleton CurrentUserID() из ЛР-3 удалена — пользователь берётся из JWT: currentUserID(ctx) в auth.go
@@ -41,6 +43,10 @@ func (a *API) fullURL(key string) string {
 
 // toCostJSON — общие поля вида затрат (черновик, добавление, публикация)
 func (a *API) toCostJSON(c repository.BreakEvenPoint) BreakEvenPointJSON {
+	return a.costJSON(c, a.Repo.GetLikesCount(c.ID))
+}
+
+func (a *API) costJSON(c repository.BreakEvenPoint, count int64) BreakEvenPointJSON {
 	return BreakEvenPointJSON{
 		ID:               c.ID,
 		CostName:         c.CostName,
@@ -52,7 +58,7 @@ func (a *API) toCostJSON(c repository.BreakEvenPoint) BreakEvenPointJSON {
 		CreatorID:        c.CreatorID,
 		CreatedAt:        c.CreatedAt,
 		FormedAt:         c.FormedAt,
-		LikesCount:       a.Repo.GetLikesCount(c.ID),
+		LikesCount:       count,
 	}
 }
 
@@ -112,34 +118,51 @@ func (a *API) ListCosts(ctx *gin.Context) {
 //
 // FeedCost godoc
 // @Summary      Лента: один вид затрат
-// @Description  Без id — первый опубликованный; с id — по id; с id и next=true — следующий после id. В ответе is_liked = 0/1 — лайк текущего пользователя. Доступно всем.
+// @Description  Без id возвращает текущую карточку сессии, с id читает карточку напрямую. С id и next=true выдаёт следующую карточку сессии.
 // @Tags         breakeven_point
 // @Produce      json
 // @Param        id   query int  false "id вида затрат"
-// @Param        next query bool false "true — следующий после id"
+// @Param        next query bool false "Перейти к следующей карточке"
+// @Param        X-Feed-Session header string false "Идентификатор сессии (32 hex-символа)"
 // @Success      200 {object} BreakEvenPointFeedJSON
 // @Failure      404 "не найден или удалён"
 // @Router       /api/breakeven_point/feed [get]
 func (a *API) FeedCost(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	if idStr == "" {
-		idStr = ctx.Query("id") // GET /api/breakeven_point/feed?id=1&next=true
+		idStr = ctx.Query("id")
 	}
-	id, _ := strconv.Atoi(idStr)
-	var (
-		c   repository.BreakEvenPoint
-		err error
-	)
-	if next := ctx.Query("next"); id > 0 && (next == "1" || next == "true") {
-		c, err = a.Repo.GetNextFeedCost(id)
+	id, parseErr := strconv.Atoi(idStr)
+	if idStr != "" && (parseErr != nil || id < 1) {
+		ctx.Status(http.StatusBadRequest)
+		return
+	}
+	next := ctx.Query("next") == "true" || ctx.Query("next") == "1"
+	var cost repository.BreakEvenPoint
+	var batch feedBatch
+	var err error
+	if id > 0 && !next {
+		cost, err = a.Repo.GetFeedCost(id)
 	} else {
-		c, err = a.Repo.GetFeedCost(id)
+		var after *int
+		if next && id > 0 {
+			after = &id
+		}
+		cost, batch, err = a.sessionCost(ctx, after)
 	}
-	if err != nil {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
 		ctx.Status(http.StatusNotFound)
 		return
 	}
-	ctx.JSON(http.StatusOK, a.toFeedJSON(c, currentUserID(ctx)))
+	if err != nil {
+		ctx.Error(err)
+		ctx.Status(http.StatusServiceUnavailable)
+		return
+	}
+	result := a.toFeedJSON(cost, currentUserID(ctx))
+	result.Batch, result.Position, result.BatchSize = batch.Number, batchPosition(batch, cost.ID), len(batch.IDs)
+	ctx.Header("Cache-Control", "no-store")
+	ctx.JSON(http.StatusOK, result)
 }
 
 // 3. GET /api/breakeven_point/draft — черновик текущего пользователя (не более одного), id не передаётся

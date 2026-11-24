@@ -5,6 +5,10 @@ definitions:
       amount_monthly:
         description: null у черновика
         type: number
+      batch:
+        type: integer
+      batch_size:
+        type: integer
       cost_name:
         type: string
       created_at:
@@ -25,6 +29,8 @@ definitions:
       is_liked:
         type: integer
       likes_count:
+        type: integer
+      position:
         type: integer
       short_description:
         description: null у черновика
@@ -96,6 +102,19 @@ definitions:
       video_url:
         description: '"" → клиент показывает видео по умолчанию'
         type: string
+    type: object
+  api.CatalogPage:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/api.BreakEvenPointListJSON'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
     type: object
   api.LikeRequest:
     properties:
@@ -333,6 +352,47 @@ paths:
       summary: Опубликовать свой черновик
       tags:
       - breakeven_point
+  /api/breakeven_point/catalog:
+    get:
+      parameters:
+      - description: Сумма от, ₽/мес
+        in: query
+        name: min_amount
+        type: number
+      - description: Сумма до, ₽/мес
+        in: query
+        name: max_amount
+        type: number
+      - description: Тип затрат
+        enum:
+        - 0
+        - 1
+        in: query
+        name: is_fixed
+        type: integer
+      - default: 1
+        description: Номер страницы
+        in: query
+        name: page
+        type: integer
+      - default: 24
+        description: Карточек на странице
+        in: query
+        maximum: 100
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/api.CatalogPage'
+        "400":
+          description: некорректные параметры каталога
+      summary: Постраничный каталог опубликованных видов затрат
+      tags:
+      - breakeven_point
   /api/breakeven_point/draft:
     get:
       description: Не более одного черновика у пользователя, id не передаётся. Доступно
@@ -355,18 +415,21 @@ paths:
       - breakeven_point
   /api/breakeven_point/feed:
     get:
-      description: Без id — первый опубликованный; с id — по id; с id и next=true
-        — следующий после id. В ответе is_liked = 0/1 — лайк текущего пользователя.
-        Доступно всем.
+      description: Без id возвращает текущую карточку сессии, с id читает карточку
+        напрямую. С id и next=true выдаёт следующую карточку сессии.
       parameters:
       - description: id вида затрат
         in: query
         name: id
         type: integer
-      - description: true — следующий после id
+      - description: Перейти к следующей карточке
         in: query
         name: next
         type: boolean
+      - description: Идентификатор сессии (32 hex-символа)
+        in: header
+        name: X-Feed-Session
+        type: string
       produces:
       - application/json
       responses:
@@ -377,6 +440,27 @@ paths:
         "404":
           description: не найден или удалён
       summary: 'Лента: один вид затрат'
+      tags:
+      - breakeven_point
+  /api/breakeven_point/feed/session:
+    get:
+      parameters:
+      - description: Идентификатор сессии (32 hex-символа)
+        in: header
+        name: X-Feed-Session
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+        "503":
+          description: хранилище недоступно
+      summary: Подготовить порцию сессионной ленты
       tags:
       - breakeven_point
   /api/users/login:
