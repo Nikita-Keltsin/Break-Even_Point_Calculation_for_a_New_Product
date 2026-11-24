@@ -59,6 +59,7 @@ func StartServer() {
 
 	// ---------- ЛР-3 + ЛР-4: веб-сервис REST API (10 методов) с авторизацией ----------
 	a := &API{Repo: repo, MC: mc, RDB: rdb}
+	r.PUT("/internal/costs/:id/rotation", a.SaveRotation)
 	apiR := r.Group("/api")
 	{
 		bep := apiR.Group("/breakeven_point") // домен breakeven_point (услуга — вид затрат)

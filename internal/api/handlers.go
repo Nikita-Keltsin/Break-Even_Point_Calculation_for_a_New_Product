@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"Break-Even_Point_Calculation_for_a_New_Product/internal/app/repository"
 
@@ -48,6 +49,7 @@ func (a *API) toCostJSON(c repository.BreakEvenPoint) BreakEvenPointJSON {
 
 func (a *API) costJSON(c repository.BreakEvenPoint, count int64) BreakEvenPointJSON {
 	return BreakEvenPointJSON{
+		ModelURL: a.fullURL(c.ModelKey), AngleX: c.AngleX, AngleY: c.AngleY, RotationVersion: c.RotationVersion,
 		ID:               c.ID,
 		CostName:         c.CostName,
 		ShortDescription: c.ShortDescription,
@@ -161,6 +163,9 @@ func (a *API) FeedCost(ctx *gin.Context) {
 	}
 	result := a.toFeedJSON(cost, currentUserID(ctx))
 	result.Batch, result.Position, result.BatchSize = batch.Number, batchPosition(batch, cost.ID), len(batch.IDs)
+	if next {
+		result.RotationScheduled = a.queueRotation(ctx.Request.Context(), cost.ID) == nil
+	}
 	ctx.Header("Cache-Control", "no-store")
 	ctx.JSON(http.StatusOK, result)
 }
@@ -198,7 +203,8 @@ func (a *API) GetDraft(ctx *gin.Context) {
 // @Produce      json
 // @Param        name  formData string true  "Название"
 // @Param        image formData file   false "Фото"
-// @Param        video formData file   false "Видео"
+// @Param        model formData file   false "Модель GLB до 20 МиБ"
+// @Param        video formData file   false "Видео для совместимости со старым клиентом"
 // @Success      201 {object} BreakEvenPointJSON
 // @Failure      400 "нет названия"
 // @Failure      401 "нет токена"
@@ -210,27 +216,31 @@ func (a *API) CreateCost(ctx *gin.Context) {
 		ctx.Status(http.StatusConflict) // не более одного черновика
 		return
 	}
-	name := ctx.PostForm("name")
-	if name == "" {
+	ctx.Request.Body = http.MaxBytesReader(ctx.Writer, ctx.Request.Body, 26<<20)
+	if err := ctx.Request.ParseMultipartForm(8 << 20); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid multipart or upload exceeds 26 MiB"})
+		return
+	}
+	defer ctx.Request.MultipartForm.RemoveAll()
+	name := strings.TrimSpace(ctx.Request.FormValue("name"))
+	if name == "" || utf8.RuneCountInString(name) > 100 {
 		ctx.Status(http.StatusBadRequest)
 		return
 	}
-	imageKey, videoKey := "", ""
-	if f, h, err := ctx.Request.FormFile("image"); err == nil {
-		defer f.Close()
-		if key, uerr := UploadFile(a.MC, uid, "image", f, h.Filename, h.Header.Get("Content-Type")); uerr == nil {
-			imageKey = key
-		}
-	}
-	if f, h, err := ctx.Request.FormFile("video"); err == nil {
-		defer f.Close()
-		if key, uerr := UploadFile(a.MC, uid, "video", f, h.Filename, h.Header.Get("Content-Type")); uerr == nil {
-			videoKey = key
-		}
-	}
-	c, err := a.Repo.CreateDraftWithMedia(uid, name, imageKey, videoKey)
+	files, err := a.uploadCostMedia(ctx, uid)
 	if err != nil {
-		ctx.Status(http.StatusInternalServerError)
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	c, err := a.Repo.CreateDraftWithModel(uid, name, files["image"], files["video"], files["model"])
+	if err != nil {
+		a.removeCostMedia(files)
+		if _, existsErr := a.Repo.GetDraftByUser(uid); existsErr == nil {
+			ctx.Status(http.StatusConflict)
+		} else {
+			ctx.Error(err)
+			ctx.Status(http.StatusInternalServerError)
+		}
 		return
 	}
 	ctx.JSON(http.StatusCreated, a.toCostJSON(*c))

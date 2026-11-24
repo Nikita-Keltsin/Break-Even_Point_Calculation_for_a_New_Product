@@ -94,7 +94,13 @@ const docTemplate = `{
                     },
                     {
                         "type": "file",
-                        "description": "Видео",
+                        "description": "Модель GLB до 20 МиБ",
+                        "name": "model",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Видео для совместимости со старым клиентом",
                         "name": "video",
                         "in": "formData"
                     }
@@ -536,6 +542,44 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/internal/costs/{id}/rotation": {
+            "put": {
+                "tags": [
+                    "rotation"
+                ],
+                "summary": "Сохранить результат поворота 3D-модели",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "ID вида затрат",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Ключ межсервисного вызова",
+                        "name": "X-Rotation-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "результат сохранён"
+                    },
+                    "400": {
+                        "description": "некорректные поля"
+                    },
+                    "401": {
+                        "description": "неверный ключ"
+                    },
+                    "409": {
+                        "description": "версия изменилась или карточка недоступна"
+                    }
+                }
+            }
         }
     },
     "definitions": {
@@ -545,6 +589,12 @@ const docTemplate = `{
                 "amount_monthly": {
                     "description": "null у черновика",
                     "type": "number"
+                },
+                "angle_x": {
+                    "type": "integer"
+                },
+                "angle_y": {
+                    "type": "integer"
                 },
                 "batch": {
                     "type": "integer"
@@ -582,7 +632,16 @@ const docTemplate = `{
                 "likes_count": {
                     "type": "integer"
                 },
+                "model_url": {
+                    "type": "string"
+                },
                 "position": {
+                    "type": "integer"
+                },
+                "rotation_scheduled": {
+                    "type": "boolean"
+                },
+                "rotation_version": {
                     "type": "integer"
                 },
                 "short_description": {
@@ -601,6 +660,12 @@ const docTemplate = `{
                 "amount_monthly": {
                     "description": "null у черновика",
                     "type": "number"
+                },
+                "angle_x": {
+                    "type": "integer"
+                },
+                "angle_y": {
+                    "type": "integer"
                 },
                 "cost_name": {
                     "type": "string"
@@ -629,6 +694,12 @@ const docTemplate = `{
                 "likes_count": {
                     "type": "integer"
                 },
+                "model_url": {
+                    "type": "string"
+                },
+                "rotation_version": {
+                    "type": "integer"
+                },
                 "short_description": {
                     "description": "null у черновика",
                     "type": "string"
@@ -645,6 +716,12 @@ const docTemplate = `{
                 "amount_monthly": {
                     "description": "null у черновика",
                     "type": "number"
+                },
+                "angle_x": {
+                    "type": "integer"
+                },
+                "angle_y": {
+                    "type": "integer"
                 },
                 "cost_name": {
                     "type": "string"
@@ -674,6 +751,12 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "likes_count": {
+                    "type": "integer"
+                },
+                "model_url": {
+                    "type": "string"
+                },
+                "rotation_version": {
                     "type": "integer"
                 },
                 "short_description": {

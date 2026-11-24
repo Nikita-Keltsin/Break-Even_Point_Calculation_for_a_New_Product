@@ -81,3 +81,9 @@ docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U postgres -d breakeven
 `GET /api/breakeven_point/catalog` принимает `page`, `page_size`, `min_amount`, `max_amount` и `is_fixed`. Размер страницы по умолчанию 24, максимум 100. Ответ содержит `items`, `total`, `page` и `page_size`. Планы сравниваются в транзакции с откатом удаления индексов.
 
 `GET /api/breakeven_point/feed/session` создаёт порцию из 100 уникальных ID при достаточном количестве карточек. При исчерпании порции Redis сохраняет новую. Для проверки ключей используйте `redis-cli --scan --pattern 'feed:*'`. Для демонстрации в React используйте ветку `extra-db-indexes` фронтенда.
+
+## Дополнительное задание по асинхронному повороту
+
+Примените `migrations/006_model_rotation.sql` после миграций ветки `extra-db-indexes`. Запустите сервис поворота NestJS на порту 3100. Для совместного запуска укажите одинаковый `ROTATION_KEY` у Go и NestJS и при необходимости задайте `ROTATION_URL` для Go.
+
+`GET /api/breakeven_point/feed?next=true` ставит поворот в очередь. Через 5–10 с NestJS отправляет новые углы и прочитанную версию в `PUT /internal/costs/{id}/rotation`. Этот адрес предназначен для внутреннего доступа. Клиент читает результат через `GET /api/breakeven_point/feed/{id}`.

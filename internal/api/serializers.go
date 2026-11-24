@@ -7,6 +7,10 @@ import "time"
 // BreakEvenPointJSON — общие поля вида затрат (таблица breakeven_point) в ответах API.
 // Статус на клиент не передаётся; удалённые записи не отдаются вовсе.
 type BreakEvenPointJSON struct {
+	ModelURL         string     `json:"model_url"`
+	AngleX           int        `json:"angle_x"`
+	AngleY           int        `json:"angle_y"`
+	RotationVersion  int        `json:"rotation_version"`
 	ID               int        `json:"id"`
 	CostName         string     `json:"cost_name"`
 	ShortDescription *string    `json:"short_description"` // null у черновика
@@ -31,11 +35,12 @@ type BreakEvenPointListJSON struct {
 // is_liked = 0/1 — поставил ли текущий пользователь лайк (по нему закрашено сердечко
 // и клиент решает, что отправить в POST /like: 1 или 0)
 type BreakEvenPointFeedJSON struct {
+	Batch             int  `json:"batch,omitempty"`
+	Position          int  `json:"position,omitempty"`
+	BatchSize         int  `json:"batch_size,omitempty"`
+	RotationScheduled bool `json:"rotation_scheduled"`
 	BreakEvenPointJSON
-	IsLiked   int `json:"is_liked"`
-	Batch     int `json:"batch"`
-	Position  int `json:"position"`
-	BatchSize int `json:"batch_size"`
+	IsLiked int `json:"is_liked"`
 }
 
 // LikeResponse — ответ POST /api/breakeven_point/:id/like

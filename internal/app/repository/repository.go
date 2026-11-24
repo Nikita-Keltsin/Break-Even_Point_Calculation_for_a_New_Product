@@ -29,6 +29,10 @@ type User struct {
 // 4 необязательных поля (NULL у черновика, заполняются при публикации):
 // short_description, amount_monthly, is_fixed, formed_at.
 type BreakEvenPoint struct {
+	ModelKey         string
+	AngleX           int `gorm:"default:(-)"`
+	AngleY           int `gorm:"default:(-)"`
+	RotationVersion  int
 	ID               int        `gorm:"primaryKey"`
 	CostName         string     `gorm:"type:varchar(100);not null"`
 	ShortDescription *string    `gorm:"type:varchar(255)"` // NULL у черновика
@@ -235,8 +239,8 @@ func (r *Repository) SetLike(uid, costID int, set bool) error {
 	return r.DB.Where("user_id = ? AND cost_id = ?", uid, costID).Delete(&Like{}).Error
 }
 
-func (r *Repository) CreateDraftWithMedia(uid int, name, imageKey, videoKey string) (*BreakEvenPoint, error) {
-	c := BreakEvenPoint{CostName: name, Status: "draft", CreatorID: uid, ImageURL: imageKey, VideoURL: videoKey}
+func (r *Repository) CreateDraftWithModel(uid int, name, imageKey, videoKey, modelKey string) (*BreakEvenPoint, error) {
+	c := BreakEvenPoint{CostName: name, Status: "draft", CreatorID: uid, ImageURL: imageKey, VideoURL: videoKey, ModelKey: modelKey}
 	if err := r.DB.Create(&c).Error; err != nil {
 		return nil, err
 	}

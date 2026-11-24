@@ -5,6 +5,10 @@ definitions:
       amount_monthly:
         description: null у черновика
         type: number
+      angle_x:
+        type: integer
+      angle_y:
+        type: integer
       batch:
         type: integer
       batch_size:
@@ -30,7 +34,13 @@ definitions:
         type: integer
       likes_count:
         type: integer
+      model_url:
+        type: string
       position:
+        type: integer
+      rotation_scheduled:
+        type: boolean
+      rotation_version:
         type: integer
       short_description:
         description: null у черновика
@@ -44,6 +54,10 @@ definitions:
       amount_monthly:
         description: null у черновика
         type: number
+      angle_x:
+        type: integer
+      angle_y:
+        type: integer
       cost_name:
         type: string
       created_at:
@@ -63,6 +77,10 @@ definitions:
         type: boolean
       likes_count:
         type: integer
+      model_url:
+        type: string
+      rotation_version:
+        type: integer
       short_description:
         description: null у черновика
         type: string
@@ -75,6 +93,10 @@ definitions:
       amount_monthly:
         description: null у черновика
         type: number
+      angle_x:
+        type: integer
+      angle_y:
+        type: integer
       cost_name:
         type: string
       created_at:
@@ -95,6 +117,10 @@ definitions:
       is_mine:
         type: integer
       likes_count:
+        type: integer
+      model_url:
+        type: string
+      rotation_version:
         type: integer
       short_description:
         description: null у черновика
@@ -234,7 +260,11 @@ paths:
         in: formData
         name: image
         type: file
-      - description: Видео
+      - description: Модель GLB до 20 МиБ
+        in: formData
+        name: model
+        type: file
+      - description: Видео для совместимости со старым клиентом
         in: formData
         name: video
         type: file
@@ -529,6 +559,31 @@ paths:
       summary: Регистрация пользователя
       tags:
       - users
+  /internal/costs/{id}/rotation:
+    put:
+      parameters:
+      - description: ID вида затрат
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Ключ межсервисного вызова
+        in: header
+        name: X-Rotation-Key
+        required: true
+        type: string
+      responses:
+        "204":
+          description: результат сохранён
+        "400":
+          description: некорректные поля
+        "401":
+          description: неверный ключ
+        "409":
+          description: версия изменилась или карточка недоступна
+      summary: Сохранить результат поворота 3D-модели
+      tags:
+      - rotation
 securityDefinitions:
   BearerAuth:
     description: 'Введите: Bearer <access_token из POST /api/users/login>'

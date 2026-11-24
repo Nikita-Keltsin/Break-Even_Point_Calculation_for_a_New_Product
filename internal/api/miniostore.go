@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"fmt"
-	"mime/multipart"
 	"path"
 	"strings"
 	"time"
@@ -18,8 +17,8 @@ const (
 )
 
 func NewMinIOClient() (*minio.Client, error) {
-	return minio.New(minioEndpoint, &minio.Options{
-		Creds: credentials.NewStaticV4("root", "rootpassword", ""),
+	return minio.New(setting("MINIO_ENDPOINT", minioEndpoint), &minio.Options{
+		Creds: credentials.NewStaticV4(setting("MINIO_USER", "root"), setting("MINIO_PASSWORD", "rootpassword"), ""),
 	})
 }
 
@@ -43,7 +42,7 @@ func EnsureBucket(mc *minio.Client) error {
 func latinName(uid int, kind, orig string) string {
 	ext := strings.ToLower(path.Ext(orig))
 	switch ext {
-	case ".jpg", ".jpeg", ".png", ".webp", ".mp4", ".webm", ".mov":
+	case ".jpg", ".jpeg", ".png", ".webp", ".mp4", ".webm", ".mov", ".glb":
 	default:
 		if kind == "video" {
 			ext = ".mp4"
@@ -52,10 +51,4 @@ func latinName(uid int, kind, orig string) string {
 		}
 	}
 	return fmt.Sprintf("cost_%d_%s_%d%s", uid, kind, time.Now().UnixNano(), ext)
-}
-
-func UploadFile(mc *minio.Client, uid int, kind string, file multipart.File, orig, contentType string) (string, error) {
-	key := latinName(uid, kind, orig)
-	_, err := mc.PutObject(context.Background(), BucketName, key, file, -1, minio.PutObjectOptions{ContentType: contentType})
-	return key, err
 }
