@@ -62,7 +62,7 @@ func StartServer() {
 	r.PUT("/internal/costs/:id/rotation", a.SaveRotation)
 	apiR := r.Group("/api")
 	{
-		bep := apiR.Group("/breakeven_point") // домен breakeven_point (услуга — вид затрат)
+		bep := apiR.Group("/breakeven_point") // домен breakeven_point
 		// гость и создатель: только чтение (с токеном заполняются like и is_mine)
 		bep.GET("", a.WithOptionalAuth, a.ListCosts)
 		bep.GET("/catalog", a.WithOptionalAuth, a.Catalog)

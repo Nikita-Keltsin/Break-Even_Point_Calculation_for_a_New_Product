@@ -74,7 +74,7 @@ func (a *API) toFeedJSON(c repository.BreakEvenPoint, uid int) BreakEvenPointFee
 	return BreakEvenPointFeedJSON{BreakEvenPointJSON: a.toCostJSON(c), IsLiked: boolTo01(uid != 0 && a.Repo.HasLiked(uid, c.ID))}
 }
 
-// ===================== ДОМЕН «УСЛУГА» (/api/breakeven_point) =====================
+// ===================== ДОМЕН «ВИДЫ ЗАТРАТ» (/api/breakeven_point) =====================
 
 // 1. GET /api/breakeven_point?min_amount=&max_amount=&is_fixed=0|1 — список опубликованных, фильтр на бэкенде
 //
@@ -294,7 +294,7 @@ func (a *API) PublishCost(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, a.toCostJSON(c))
 }
 
-// 6. DELETE /api/breakeven_point/:id — только soft delete своей услуги (status = 'deleted', ORM)
+// 6. DELETE /api/breakeven_point/:id — только soft delete своего вида затрат (status = 'deleted', ORM)
 //
 // DeleteCost godoc
 // @Summary      Удалить свой вид затрат (soft delete)
