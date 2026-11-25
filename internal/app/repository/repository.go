@@ -25,7 +25,7 @@ type User struct {
 	Role         string `gorm:"type:varchar(20);not null;default:'creator'"`
 }
 
-// BreakEvenPoint — услуга (вид затрат для расчёта точки безубыточности), таблица breakeven_point.
+// BreakEvenPoint — вид затрат для расчёта точки безубыточности, таблица breakeven_point.
 // 4 необязательных поля (NULL у черновика, заполняются при публикации):
 // short_description, amount_monthly, is_fixed, formed_at.
 type BreakEvenPoint struct {
@@ -108,7 +108,7 @@ func (r *Repository) VideoURL(c BreakEvenPoint) string {
 
 // ===== ЛР-2: ORM =====
 
-// GetPublishedCosts — поиск/фильтрация опубликованных услуг (ORM, фильтр в SQL WHERE)
+// GetPublishedCosts — поиск/фильтрация опубликованных видов затрат (ORM, фильтр в SQL WHERE)
 // kind: "fixed" | "variable" | "" (все)
 func (r *Repository) GetPublishedCosts(from, to float64, hasFrom, hasTo bool, kind string) ([]BreakEvenPoint, error) {
 	q := r.DB.Where("status = ?", "published")
@@ -202,7 +202,7 @@ func (r *Repository) DeleteCostSQL(id int) error {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return fmt.Errorf("услуга не найдена или уже удалена")
+		return fmt.Errorf("вид затрат не найден или уже удалён")
 	}
 	return nil
 }

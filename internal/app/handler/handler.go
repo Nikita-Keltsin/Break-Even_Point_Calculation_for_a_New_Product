@@ -11,7 +11,7 @@ import (
 )
 
 // ЛР-2 (SSR): 6 HTTP-методов
-//   GET  /breakeven-point/cost-types  — плитка услуг + поиск (ORM)
+//   GET  /breakeven-point/cost-types  — плитка видов затрат + поиск (ORM)
 //   GET  /breakeven-point/feed[/:id]  — лента, одна строка из БД (ORM)
 //   GET  /breakeven-point/addition    — добавление (ORM)
 //   POST /breakeven-point/draft       — «Далее»: создать черновик (ORM)
@@ -94,7 +94,7 @@ func (h *Handler) FeedHandler(ctx *gin.Context) {
 	id, _ := strconv.Atoi(idStr)
 	cost, err := h.Repository.GetFeedCost(id) // одна строка из БД
 	if err != nil {
-		ctx.String(http.StatusNotFound, "Услуга не найдена или была удалена")
+		ctx.String(http.StatusNotFound, "Вид затрат не найден или был удалён")
 		return
 	}
 	next, err := h.Repository.GetNextFeedCost(cost.ID)

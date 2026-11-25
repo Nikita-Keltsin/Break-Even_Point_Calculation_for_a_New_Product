@@ -1,6 +1,6 @@
 -- breakeven_point: схема БД (ЛР-2/ЛР-3)
 -- Каскадное удаление запрещено: все внешние ключи ON DELETE RESTRICT.
--- 4 необязательных поля услуги (NULL у черновика, заполняются при публикации):
+-- 4 необязательных поля вида затрат (NULL у черновика, заполняются при публикации):
 -- short_description, amount_monthly, is_fixed, formed_at.
 
 -- таблицы прошлых итераций лабы
@@ -18,7 +18,7 @@ CREATE TABLE users (
     role          VARCHAR(20)  NOT NULL DEFAULT 'creator'
 );
 
--- Услуги = виды затрат для расчёта точки безубыточности
+-- Виды затрат для расчёта точки безубыточности
 CREATE TABLE breakeven_point (
     id                SERIAL        PRIMARY KEY,
     cost_name         VARCHAR(100)  NOT NULL,             -- наименование
@@ -37,7 +37,7 @@ CREATE TABLE breakeven_point (
 -- у каждого пользователя не более одного черновика
 CREATE UNIQUE INDEX idx_one_draft_per_user ON breakeven_point(creator_id) WHERE status = 'draft';
 
--- Лайки: м-м пользователь — услуга (первичный и два внешних ключа)
+-- Лайки: м-м пользователь — вид затрат (первичный и два внешних ключа)
 CREATE TABLE likes (
     id      SERIAL PRIMARY KEY,
     user_id INT    NOT NULL REFERENCES users(id)      ON DELETE RESTRICT,
